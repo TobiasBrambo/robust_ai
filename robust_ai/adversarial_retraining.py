@@ -90,75 +90,75 @@ def evaluate(model, testloader):
     
 
 
-def retrain_resnet50():
+def retrain_resnet50(num_epochs:int = 1):
 
-    batch_size = 64
+    batch_size = 64  # You can adjust this based on your available memory and resources
     learning_rate = 0.001
 
+    # Load pre-trained ResNet-50 model
     model = models.resnet50(pretrained=True).to(device)
 
-    preprocessing = dict(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], axis=-3)
-
-    fmodel = fb.PyTorchModel(model, bounds=(0,1), preprocessing=preprocessing)
-
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate) 
-
+    # Update transformation for CIFAR-10 (32x32 images)
     transform = transforms.Compose([
-        transforms.Resize(256),
+        transforms.Resize(224),  # Resize CIFAR-10 images to 224x224 for ResNet-50
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
         transforms.RandomRotation(degrees=45),
         transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
-        transforms.CenterCrop(224),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        # Normalization for CIFAR-10 dataset
+        transforms.Normalize([0.5, 0.5, 0.5], [0.5,0.5,0.5])
     ])
 
-    train_dataset = torchvision.datasets.ImageNet( root="./data/raw_files", transform=transform)
+    # Create a foolbox model for adversarial attack generation
+    fmodel = fb.PyTorchModel(model, bounds=(-1, 1), preprocessing=None)
+    attack = fb.attacks.LinfFastGradientAttack()
 
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+    # Define the loss function and optimizer
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate) 
 
+    # CIFAR-10 dataset
+    trainset = torchvision.datasets.CIFAR10(root='./data/raw_files', train=True, download=True, transform=transform)
+    train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True)
 
+    # Training loop
     for epoch in range(num_epochs):
         total_loss = 0
         for inputs, labels in train_loader:
-            # Move input and label tensors to the device
+            # Move inputs and labels to the device (GPU or CPU)
             inputs = inputs.to(device)
             labels = labels.to(device)
 
-            # Zero out the optimizer
+            # Zero out the gradients from the previous iteration
             optimizer.zero_grad()
 
-            # Forward pass
+            # Forward pass (clean inputs)
             outputs = model(inputs)
             loss = criterion(outputs, labels)
 
+            # Generate adversarial examples
+            _, adversarial_inputs, _ = attack(fmodel, inputs, labels, epsilons=0.01)
+            adversarial_inputs = adversarial_inputs.to(device)
 
-            _, adversarial_inputs, _= attack(fmodel, inputs, labels, epsilons=0.01)
-            
-            # Compute loss on adversarial inputs
+            # Forward pass (adversarial inputs)
             adv_outputs = model(adversarial_inputs)
             adv_loss = criterion(adv_outputs, labels)
-            
-            # Combine the loss (you can balance clean and adversarial loss)
+
+            # Combine losses (adjust the ratio if needed)
             total_loss = loss + adv_loss
-            
+
             # Backward pass and optimize
             total_loss.backward()
             optimizer.step()
 
-            # Backward pass
-            loss.backward()
-            optimizer.step()
-
-    # Print the loss for every epoch
+        # Print the loss for each epoch
         print(f'Epoch {epoch+1}/{num_epochs}, Loss: {total_loss.item():.4f}')
 
+    # Save the trained model
+    torch.save(model.state_dict(), './trained_models/resnet50_cifar10.pth')
+
     print(f'Finished Training, Loss: {loss.item():.4f}')
-
-
-    torch.save(model.state_dict(), './trained_models')
 
 
 
