@@ -90,7 +90,7 @@ def evaluate(model, testloader):
     
 
 
-def retrain_resnet50(num_epochs:int = 1):
+def retrain_resnet50(num_epochs:int = 10):
 
     batch_size = 64  # You can adjust this based on your available memory and resources
     learning_rate = 0.001
@@ -123,6 +123,7 @@ def retrain_resnet50(num_epochs:int = 1):
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True)
 
     # Training loop
+    print("training")
     for epoch in range(num_epochs):
         total_loss = 0
         for inputs, labels in train_loader:
