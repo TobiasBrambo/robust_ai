@@ -162,6 +162,50 @@ def retrain_resnet50(num_epochs:int = 10):
     print(f'Finished Training, Loss: {loss.item():.4f}')
 
 
+    
+def evaluate_resnet50(model, fmodel, attack=None):
+
+
+    model.to(device)
+    model.eval()
+
+
+    def accuracy(preds, labels):
+        _, predicted = torch.max(preds, 1)
+        return (predicted == labels).sum().item()
+
+    
+    for images, labels in test_loader:
+            images, labels = images.to(device), labels.to(device)
+            total += labels.size(0)
+
+            # Evaluate on regular images
+            with torch.no_grad():
+                outputs = model(images)
+                regular_correct += accuracy(outputs, labels)
+
+            # Evaluate on perturbed images (if attack is provided)
+            if attack is not None:
+                images_np = images.cpu().numpy()  # Convert to NumPy for Foolbox
+                labels_np = labels.cpu().numpy()
+
+                # Apply the adversarial attack
+                perturbed_images_np = attack(fmodel, images_np, labels_np)
+                perturbed_images = torch.tensor(perturbed_images_np).to(device)
+
+                with torch.no_grad():
+                    perturbed_outputs = model(perturbed_images)
+                    perturbed_correct += accuracy(perturbed_outputs, labels)
+
+        regular_accuracy = regular_correct / total
+        perturbed_accuracy = perturbed_correct / total if attack is not None else None
+
+        return {
+            "regular_accuracy": regular_accuracy,
+            "perturbed_accuracy": perturbed_accuracy
+        }
+
+
 
 
 if __name__ == "__main__":
