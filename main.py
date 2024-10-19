@@ -1,6 +1,6 @@
 
-from robust_ai.experiments import cnn_cifar10_experiment
+from robust_ai.adversarial_retraining import train_cnn_base
 
 
 
-cnn_cifar10_experiment()
+train_cnn_base()

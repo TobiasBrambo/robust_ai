@@ -1,239 +1,274 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torchvision
-import torchvision.models as models
-import torchvision.transforms as transforms
+
+import tqdm
+from time import perf_counter
+from cpuinfo import get_cpu_info
 
 import foolbox as fb
+# alternativ: https://github.com/ndb796/Pytorch-Adversarial-Training-CIFAR
+
+from data import cifar10
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if torch.cuda.is_available():
+    device = torch.device('cuda')
+    device_num = torch.cuda.current_device()
+    device_info = torch.cuda.get_device_name(device_num)
 
+else:
+    device = torch.device('cpu')
+    device_info = get_cpu_info()['brand_raw']
 
-# Example CNN model for image classification
-class SimpleCNN(nn.Module):
-    def __init__(self):
-        super(SimpleCNN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 16, 3, padding=1)
-        self.conv2 = nn.Conv2d(16, 32, 3, padding=1)
-        self.fc1 = nn.Linear(32 * 8 * 8, 128)
-        self.fc2 = nn.Linear(128, 10)
+def has_converged(accuracies, tolerance=1.0, patience=5):
+    """Checks if the model has converged based on the change in accuracy."""
     
+    if len(accuracies) < patience:
+        return False
+    # Check if the improvement in accuracy is less than tolerance for last `patience` epochs
+    for i in range(1, patience + 1):
+        if abs(accuracies[-i] - accuracies[-i - 1]) > tolerance:
+            return False
+    return True
+
+
+class CNN(nn.Module):
+    def __init__(self, n_classes=10, converger=None):
+        super(CNN, self).__init__()
+
+        self.converger = converger
+
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.conv3 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(128)
+        
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.relu = nn.ReLU()
+        
+        self.fc1 = nn.Linear(128 * 4 * 4, 1000)
+        self.fc2 = nn.Linear(1000, n_classes)  
+        
+        self.dropout = nn.Dropout(p=0.1)
+
+        self.softmax = nn.Softmax(dim=1)
+
     def forward(self, x):
-        x = nn.ReLU()(self.conv1(x))
-        x = nn.MaxPool2d(2)(x)
-        x = nn.ReLU()(self.conv2(x))
-        x = nn.MaxPool2d(2)(x)
-        x = x.view(-1, 32 * 8 * 8)
-        x = nn.ReLU()(self.fc1(x))
+
+        x = self.relu(self.bn1(self.conv1(x)))
+        x = self.pool(x)
+        
+        x = self.relu(self.bn2(self.conv2(x)))
+        x = self.pool(x)
+        
+        x = self.relu(self.bn3(self.conv3(x)))
+        x = self.pool(x)
+        
+        x = x.view(x.size(0), -1)
+        
+        x = self.dropout(x)
+        x = self.relu(self.fc1(x))
         x = self.fc2(x)
+
+        
         return x
 
+    def save_model(self, save_name:str = "CNN_model.pth"):
+
+        save_path = f"trained_models/{save_name}"
+        torch.save(self.state_dict(), save_path)
+
+        print(f"Saved model to: {save_path}")
 
 
-def train_model(model, criterion, optimizer, fmodel, attack, trainloader, epochs:int = 10):
+    def fit(self, train_loader, test_loader, num_epochs=10, lr=0.001, loss_function=None, visualizer=None, disable_progress_bar=False, test_frequency=5):
 
-    for epoch in range(epochs):  # Iterate through epochs
-        running_loss = 0.0
-        for i, data in enumerate(trainloader, 0):
-            # Get the inputs; data is a list of [inputs, labels]
-            inputs, labels = data
-            inputs, labels = inputs.to(device), labels.to(device)
-            
-            # Zero the parameter gradients
-            optimizer.zero_grad()
-            
-            # Forward pass
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            
+        optimizer = optim.Adam(self.parameters(), lr=lr)
+        criterion = loss_function
 
-            _, adversarial_inputs, _= attack(fmodel, inputs, labels, epsilons=0.01)
-            
-            # Compute loss on adversarial inputs
-            adv_outputs = model(adversarial_inputs)
-            adv_loss = criterion(adv_outputs, labels)
-            
-            # Combine the loss (you can balance clean and adversarial loss)
-            total_loss = loss + adv_loss
-            
-            # Backward pass and optimize
-            total_loss.backward()
-            optimizer.step()
-            
-            # Print statistics
-            running_loss += total_loss.item()
-            if i % 100 == 99:    # Print every 100 mini-batches
-                print(f'[Epoch {epoch + 1}, Batch {i + 1}] loss: {running_loss / 100:.3f}')
-                running_loss = 0.0
+        with tqdm.tqdm(total=num_epochs, disable=disable_progress_bar) as progress_bar:
+            progress_bar.set_description(f"{device_info}: [N/A/{num_epochs}], Step [N/A/{len(train_loader)}], Loss: N/A, Test Acc: N/A")
 
-    print('Finished Training')
+            test_acc = 'N/A'
+            have_converged = False
+            results = {
+                'best_acc': 0,
+                'test_acc': [],
+                'train_time' : []
+            }
 
-def evaluate(model, testloader):
+            for epoch in range(num_epochs):
 
-    # correct = 0
-    # total = 0
-    #
-    # with torch.no_grad():
-    #     for data in testloader:
-    #         images, labels = data
-    #         images, labels = images.to(device), labels.to(device)
-    #
-    #         outputs = model(images)
-    #         _, pred = torch.max(outputs.data, 1)
-    #
-    #         total += labels.size(0)
-    #         correct += (pred == labels).sum().item()
+                st = perf_counter()
+                self.train()
+                for i, (images, labels) in enumerate(train_loader):
+                    images = images.to(device)
+                    labels = labels.to(device)
+                
+                    outputs = self(images)
+                    loss = criterion(outputs, labels)
+                    
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
 
-    clean_acc = fb.accuracy(fmodel, images, labels)
-    
+                    
+                    if (i+1) % 100 == 0:
+                        progress_bar.set_description(f"{device_info}: [{epoch+1}/{num_epochs}]: Step [{i+1}/{len(train_loader)}], Loss: {loss.item():.4f}, Test Acc: {test_acc}")
+                    
 
+                et = perf_counter()
+                
+                if (epoch+1) % test_frequency == 0:
 
-def retrain_resnet50(num_epochs:int = 10):
+                    self.eval()
+                    with torch.no_grad():
+                        correct = 0
+                        total = 0
+                        for images, labels in test_loader:
+                            images = images.to(device)
+                            labels = labels.to(device)
+                            outputs = self(images)
+                            _, predicted = torch.max(outputs.data, 1)
+                            total += labels.size(0)
+                            correct += (predicted == labels).sum().item()
 
-    batch_size = 64  # You can adjust this based on your available memory and resources
-    learning_rate = 0.001
+                        test_acc = 100 * correct / total
 
-    # Load pre-trained ResNet-50 model
-    model = models.resnet50(pretrained=True).to(device)
+                        results['test_acc'].append(test_acc)
+                        results['best_acc'] = max(results['best_acc'], test_acc)
 
-    # Update transformation for CIFAR-10 (32x32 images)
-    transform = transforms.Compose([
-        transforms.Resize(224),  # Resize CIFAR-10 images to 224x224 for ResNet-50
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
-        transforms.RandomRotation(degrees=45),
-        transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
-        transforms.ToTensor(),
-        # Normalization for CIFAR-10 dataset
-        transforms.Normalize([0.5, 0.5, 0.5], [0.5,0.5,0.5])
-    ])
+                results['train_time'].append(et-st)
 
-    # Create a foolbox model for adversarial attack generation
-    fmodel = fb.PyTorchModel(model, bounds=(-1, 1), preprocessing=None)
-    attack = fb.attacks.LinfFastGradientAttack()
+                if self.converger is not None and not have_converged:
 
-    # Define the loss function and optimizer
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate) 
+                    if self.converger(results['test_acc']):
+                        
+                        have_converged = True
+                        results['converged_at_epoch'] = epoch
 
-    # CIFAR-10 dataset
-    trainset = torchvision.datasets.CIFAR10(root='./data/raw_files', train=True, download=True, transform=transform)
-    train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True)
+                progress_bar.set_description(f"{device_info}: [{epoch+1}/{num_epochs}]: Step [{i+1}/{len(train_loader)}], Loss: {loss.item():.4f}, Test Acc: {test_acc}") 
+                progress_bar.update(1)
 
-    # Training loop
-    print("training")
-    for epoch in range(num_epochs):
-        total_loss = 0
-        for inputs, labels in train_loader:
-            # Move inputs and labels to the device (GPU or CPU)
-            inputs = inputs.to(device)
-            labels = labels.to(device)
-
-            # Zero out the gradients from the previous iteration
-            optimizer.zero_grad()
-
-            # Forward pass (clean inputs)
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-
-            # Generate adversarial examples
-            _, adversarial_inputs, _ = attack(fmodel, inputs, labels, epsilons=0.01)
-            adversarial_inputs = adversarial_inputs.to(device)
-
-            # Forward pass (adversarial inputs)
-            adv_outputs = model(adversarial_inputs)
-            adv_loss = criterion(adv_outputs, labels)
-
-            # Combine losses (adjust the ratio if needed)
-            total_loss = loss + adv_loss
-
-            # Backward pass and optimize
-            total_loss.backward()
-            optimizer.step()
-
-        # Print the loss for each epoch
-        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {total_loss.item():.4f}')
-
-    # Save the trained model
-    torch.save(model.state_dict(), './trained_models/resnet50_cifar10.pth')
-
-    print(f'Finished Training, Loss: {loss.item():.4f}')
+        return results
 
 
-    
-def evaluate_resnet50(model, fmodel, attack=None):
+    def evaluate(self, test_loader):
+
+        self.eval()
+        with torch.no_grad():
+            correct = 0
+            total = 0
+            true_labels = []
+            pred_labels = []
+
+            for images, labels in test_loader:
+                images = images.to(device)
+                labels = labels.to(device)
+                outputs = self(images)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+
+                true_labels.append(labels)
+                pred_labels.append(predicted)
+
+            test_acc = 100 * correct / total
+
+        return test_acc, true_labels, pred_labels
 
 
-    model.to(device)
-    model.eval()
+
+    def fit_with_adversaries(self, train_loader, test_loader, num_epochs=10, lr=0.001, loss_function=None, disable_progress_bar=False, test_frequency=5):
+
+        optimizer = optim.Adam(self.parameters(), lr=lr)
+        criterion = loss_function
+
+        with tqdm.tqdm(total=num_epochs, disable=disable_progress_bar) as progress_bar:
+            progress_bar.set_description(f"{device_info}: [N/A/{num_epochs}], Step [N/A/{len(train_loader)}], Loss: N/A, Test Acc: N/A")
+
+            test_acc = 'N/A'
+            have_converged = False
+            results = {
+                'best_acc': 0,
+                'test_acc': [],
+                'train_time' : []
+            }
+
+            for epoch in range(num_epochs):
+
+                st = perf_counter()
+                self.train()
+                for i, (images, labels) in enumerate(train_loader):
+                    images = images.to(device)
+                    labels = labels.to(device)
+                
+                    outputs = self(images)
+                    loss = criterion(outputs, labels)
+                    
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+
+                    
+                    if (i+1) % 100 == 0:
+                        progress_bar.set_description(f"{device_info}: [{epoch+1}/{num_epochs}]: Step [{i+1}/{len(train_loader)}], Loss: {loss.item():.4f}, Test Acc: {test_acc}")
+                    
+
+                et = perf_counter()
+                
+                if (epoch+1) % test_frequency == 0:
+
+                    self.eval()
+                    with torch.no_grad():
+                        correct = 0
+                        total = 0
+                        for images, labels in test_loader:
+                            images = images.to(device)
+                            labels = labels.to(device)
+                            outputs = self(images)
+                            _, predicted = torch.max(outputs.data, 1)
+                            total += labels.size(0)
+                            correct += (predicted == labels).sum().item()
+
+                        test_acc = 100 * correct / total
+
+                        results['test_acc'].append(test_acc)
+                        results['best_acc'] = max(results['best_acc'], test_acc)
+
+                results['train_time'].append(et-st)
+
+                if self.converger is not None and not have_converged:
+
+                    if self.converger(results['test_acc']):
+                        
+                        have_converged = True
+                        results['converged_at_epoch'] = epoch
+
+                progress_bar.set_description(f"{device_info}: [{epoch+1}/{num_epochs}]: Step [{i+1}/{len(train_loader)}], Loss: {loss.item():.4f}, Test Acc: {test_acc}") 
+                progress_bar.update(1)
+
+        return results
 
 
-    def accuracy(preds, labels):
-        _, predicted = torch.max(preds, 1)
-        return (predicted == labels).sum().item()
 
-    
-    for images, labels in test_loader:
-            images, labels = images.to(device), labels.to(device)
-            total += labels.size(0)
 
-            # Evaluate on regular images
-            with torch.no_grad():
-                outputs = model(images)
-                regular_correct += accuracy(outputs, labels)
+def train_cnn_base(num_epochs:int = 50):
+    train_loader, test_loader, classes = cifar10.get_cifar10(n_classes=0, batch_size=128, seed=42)
 
-            # Evaluate on perturbed images (if attack is provided)
-            if attack is not None:
-                images_np = images.cpu().numpy()  # Convert to NumPy for Foolbox
-                labels_np = labels.cpu().numpy()
+    loss_func = nn.CrossEntropyLoss()
+    model = CNN(converger=has_converged).to(device)
 
-                # Apply the adversarial attack
-                perturbed_images_np = attack(fmodel, images_np, labels_np)
-                perturbed_images = torch.tensor(perturbed_images_np).to(device)
+    results = model.fit(train_loader, test_loader, loss_function=loss_func, num_epochs=num_epochs, test_frequency=5)
 
-                with torch.no_grad():
-                    perturbed_outputs = model(perturbed_images)
-                    perturbed_correct += accuracy(perturbed_outputs, labels)
+    model.save_model(save_name=f"CNN_base_pretrained_cifar10_{num_epochs}ep.pth")
 
-        regular_accuracy = regular_correct / total
-        perturbed_accuracy = perturbed_correct / total if attack is not None else None
-
-        return {
-            "regular_accuracy": regular_accuracy,
-            "perturbed_accuracy": perturbed_accuracy
-        }
-
+    print(results)
 
 
 
 if __name__ == "__main__":
-
-    # Load dataset (CIFAR-10 example)
-    # transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    # trainset = torchvision.datasets.CIFAR10(root='./data/raw_files', train=True, download=True, transform=transform)
-    # trainloader = torch.utils.data.DataLoader(trainset, batch_size=32, shuffle=True)
-    #
-    # testset = torchvision.datasets.CIFAR10(root='./data/raw_files', train=False, download=True, transform=transform)
-    # print(testset.shape())
-    # testloader = torch.utils.data.DataLoader(testset, batch_size=32, shuffle=False)
-    #
-    #
-    # assert False
-
-    # Initialize model, loss, and optimizer
-    # model = SimpleCNN()
-    # criterion = nn.CrossEntropyLoss()
-    # optimizer = optim.Adam(model.parameters(), lr=0.001)
-    #
-    #
-    # fmodel = fb.PyTorchModel(model, bounds=(-1, 1))
-    # attack = fb.attacks.LinfFastGradientAttack()
-    #
-    #
-    # train_model(model, criterion, optimizer, fmodel, attack, trainloader)
-    #
-    # torch.save(model.state_dict(), 'trained_models/')
-
-    retrain_resnet50()
+    train_cnn_base()
