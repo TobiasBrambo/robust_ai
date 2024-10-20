@@ -8,9 +8,11 @@ from cpuinfo import get_cpu_info
 
 import foolbox as fb
 # alternativ: https://github.com/ndb796/Pytorch-Adversarial-Training-CIFAR
+from advertorch.context import ctx_noparamgrad_and_eval
+from advertorch.attacks import LinfPGDAttack
 
 from data import cifar10
-
+from robust_ai.utils import AverageCalculator, accuracy
 
 if torch.cuda.is_available():
     device = torch.device('cuda')
@@ -187,6 +189,10 @@ class CNN(nn.Module):
         optimizer = optim.Adam(self.parameters(), lr=lr)
         criterion = loss_function
 
+        adversary = LinfPGDAttack(
+            self, loss_fn=loss_function
+        )
+
         with tqdm.tqdm(total=num_epochs, disable=disable_progress_bar) as progress_bar:
             progress_bar.set_description(f"{device_info}: [N/A/{num_epochs}], Step [N/A/{len(train_loader)}], Loss: N/A, Test Acc: N/A")
 
@@ -205,6 +211,9 @@ class CNN(nn.Module):
                 for i, (images, labels) in enumerate(train_loader):
                     images = images.to(device)
                     labels = labels.to(device)
+
+                    with ctx_noparamgrad_and_eval(self):
+                        images = adversary.perturb(images, labels)
                 
                     outputs = self(images)
                     loss = criterion(outputs, labels)
@@ -268,7 +277,33 @@ def train_cnn_base(num_epochs:int = 50):
 
     print(results)
 
+def test_cnn_base():
+    _, test_loader, _ = cifar10.get_cifar10(n_classes=0, batch_size=128, seed=42)
+    
 
+    model = CNN()
+    model.load_state_dict(torch.load("./trained_models/CNN_base_pretrained_cifar10_50ep.pth"))
+    model.to(device)
+
+    acc, true_labels, pred_labels = model.evaluate(test_loader) 
+
+
+    print(acc)
+
+
+def train_cnn_adversary(num_epochs:int = 25):
+    train_loader, test_loader, classes = cifar10.get_cifar10(n_classes=0, batch_size=128, seed=42)
+
+    loss_func = nn.CrossEntropyLoss()
+
+    model = CNN()
+    model.load_state_dict(torch.load("./trained_models/CNN_base_pretrained_cifar10_50ep.pth"))
+    model.to(device)
+
+    results = model.fit_with_adversaries(train_loader, test_loader, loss_function=loss_func, num_epochs=num_epochs, test_frequency=5)
+    model.save_model(save_name=f"CNN_adv_pretrained_cifar10_{25}ep.pth")
+
+    print(results)
 
 if __name__ == "__main__":
     train_cnn_base()
