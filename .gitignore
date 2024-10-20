@@ -164,3 +164,4 @@ cython_debug/
 /data/raw_files/*
 trained_models/*
 pytorch-cifar/checkpoint/*
+pytorch-cifar/data/*
