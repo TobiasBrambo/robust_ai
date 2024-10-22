@@ -15,7 +15,7 @@ import argparse
 from models import *
 from utils import progress_bar
 
-from advertorch.attacks import LinfPGDAttack, CarliniWagnerL2Attack
+from advertorch.attacks import LinfPGDAttack, CarliniWagnerL2Attack, SparseL1DescentAttack
 import numpy as np
 
 
@@ -73,34 +73,17 @@ net = ResNet18()
 # net = EfficientNetB0()
 # net = RegNetX_200MF()
 # net = SimpleDLA()
-net = net.to(device)
-if device == 'cuda':
-    net = torch.nn.DataParallel(net)
-    cudnn.benchmark = True
 
 # Load checkpoint.
-print('==> Resuming from checkpoint..')
-assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
-checkpoint = torch.load('./checkpoint/resnet18_adversarial_training_TEST/best_regular_ckpt_ep190_acc92.92.pth')
-net.load_state_dict(checkpoint['net'])
-best_acc = checkpoint['acc']
-start_epoch = checkpoint['epoch']
-
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(net.parameters(), lr=args.lr,
-                      momentum=0.9, weight_decay=5e-4)
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
 # params based on: https://github.com/BorealisAI/advertorch/issues/76#issuecomment-692436644
-adversary = LinfPGDAttack(net, criterion, eps=0.031, nb_iter=10 or 7, eps_iter=0.007)
-adversary_2 = CarliniWagnerL2Attack(net, 10)
 
 import time
 import os
 
 
 
-def test(epoch):
+def test(net, adversary, adversary_2, criterion):
 
     # Regular test
     net.eval()
@@ -177,6 +160,38 @@ def test(epoch):
 
     test_acc = 100. * correct / total
 
+def loop_model_checkpoints(directory):
 
-test(0)
+    net = ResNet18()
+    
+    net = net.to(device)
+    if device == 'cuda':
+        net = torch.nn.DataParallel(net)
+        cudnn.benchmark = True
+
+    files = os.listdir(directory)
+
+
+
+    for epoch in range(200):
+        file_pattern = f'model_epoch_{epoch}.pth'
+        if file_pattern in files:
+            checkpoint_path = os.path.join(directory, file_pattern)
+            print(f'Testing checkpoint: {file_pattern}')
+            
+            # Load the checkpoint
+            checkpoint = torch.load(checkpoint_path)
+            net.load_state_dict(checkpoint['net'])
+            
+            # Define adversarial attacks
+            criterion = nn.CrossEntropyLoss()
+            adversary = LinfPGDAttack(net, criterion, eps=0.031, nb_iter=10, eps_iter=0.007)
+            adversary_2 = SparseL1DescentAttack(net, criterion) 
+            
+            # Call the test function with the model and adversaries
+            test(net, adversary, adversary_2, criterion)
+
+
+
+loop_model_checkpoints("./checkpoint/resnet18_adversarial_training_20241020_220851/")
 
