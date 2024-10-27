@@ -14,7 +14,7 @@ import argparse
 from models import *
 from utils import progress_bar
 
-from advertorch.attacks import LinfPGDAttack
+from advertorch.attacks import LinfPGDAttack, GradientSignAttack
 import numpy as np
 
 
@@ -79,7 +79,8 @@ scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
 # params based on: https://github.com/BorealisAI/advertorch/issues/76#issuecomment-692436644
 # adversary = LinfPGDAttack(net, criterion, eps=0.031, nb_iter=10, eps_iter=0.007)
-adversary = LinfPGDAttack(net, criterion, eps=0.04, nb_iter=10, eps_iter=0.007)
+# adversary = LinfPGDAttack(net, criterion, eps=0.04, nb_iter=10, eps_iter=0.007)
+adversary = GradientSignAttack(net, criterion, eps=0.05)
 
 import csv
 import time
@@ -88,7 +89,7 @@ from datetime import datetime
 
 # Create a unique checkpoint directory to avoid overwriting previous runs
 current_time = datetime.now().strftime('%Y%m%d_%H%M%S')
-checkpoint_dir = f'./checkpoint/resnet18_adversarial_training_{current_time}'
+checkpoint_dir = f'./checkpoint/resnet18_adversarial_training_gradientsign_{current_time}'
 os.makedirs(checkpoint_dir, exist_ok=True)
 
 csv_file_path = os.path.join(checkpoint_dir, 'training_results.csv')
@@ -212,7 +213,7 @@ with open(csv_file_path, 'w', newline='') as csvfile:
     writer = csv.writer(csvfile)
     writer.writerow(['Epoch', 'Train_Acc', 'Clean_Test_Acc', 'Adv_Test_Acc', 'Train_Time', 'Clean_Test_Time', 'Adv_Test_Time'])
 
-for epoch in range(start_epoch, start_epoch + 200):
+for epoch in range(start_epoch, start_epoch + 100):
     train_acc, train_time = train(epoch)
     clean_test_acc, clean_test_time, adv_test_acc, adv_test_time = test(epoch)
     scheduler.step()
