@@ -80,85 +80,19 @@ net = ResNet18()
 
 import time
 import os
+import csv
+
+def test_LinfPGD(net, criterion):
+    pass
+
+def test_SparseL1Descent(net, criterion):
+    pass
+
+def test_xyz():
+    pass
 
 
 
-def test(net, adversary, adversary_2, criterion):
-
-    # Regular test
-    net.eval()
-    test_loss = 0
-    correct = 0
-    total = 0
-    start_time = time.time()
-    for batch_idx, (inputs, targets) in enumerate(testloader):
-        inputs, targets = inputs.to(device), targets.to(device)
-        with torch.no_grad():
-            outputs = net(inputs)
-            loss = criterion(outputs, targets)
-
-            test_loss += loss.item()
-            _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
-
-            progress_bar(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                         % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
-
-    test_acc = 100. * correct / total
-    test_time = time.time() - start_time
-
-
-    # Adversarial test
-    test_loss = 0
-    correct = 0
-    total = 0
-    start_time = time.time()
-    for batch_idx, (inputs, targets) in enumerate(testloader):
-        inputs, targets = inputs.to(device), targets.to(device)
-        # Generate adversarial examples outside of torch.no_grad()
-        net.train()  # Set to train mode to allow gradients for adversary
-        inputs = adversary.perturb(inputs, targets)
-        net.eval()  # Switch back to evaluation mode
-        
-        with torch.no_grad():
-            outputs = net(inputs)
-            loss = criterion(outputs, targets)
-
-            test_loss += loss.item()
-            _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
-
-            progress_bar(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                         % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
-
-    test_acc = 100. * correct / total
-
-
-    # Adversarial test
-    test_loss = 0
-    correct = 0
-    total = 0
-    start_time = time.time()
-    for batch_idx, (inputs, targets) in enumerate(testloader):
-        inputs, targets = inputs.to(device), targets.to(device)
-        # Generate adversarial examples outside of torch.no_grad()
-        inputs = adversary_2.perturb(inputs, targets)
-        
-        with torch.no_grad():
-            outputs = net(inputs)
-            loss = criterion(outputs, targets)
-
-            test_loss += loss.item()
-            _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
-
-            progress_bar(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                         % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
-
-    test_acc = 100. * correct / total
 
 def loop_model_checkpoints(directory):
 
@@ -171,27 +105,93 @@ def loop_model_checkpoints(directory):
 
     files = os.listdir(directory)
 
+    # Prepare CSV file for results
+    csv_file = os.path.join(directory, "test_results.csv")
+    with open(csv_file, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["Epoch", "Regular Accuracy (%)", "LinfPGD Accuracy (%)", "SparseL1Descent Accuracy (%)"])
 
+        for epoch in range(200):
+            file_pattern = f'model_epoch_{epoch}.pth'
+            if file_pattern in files:
+                checkpoint_path = os.path.join(directory, file_pattern)
+                print(f'Testing checkpoint: {file_pattern}')
+                
+                # Load the checkpoint
+                checkpoint = torch.load(checkpoint_path)
+                net.load_state_dict(checkpoint)
+                
+                # Define adversarial attacks
+                criterion = nn.CrossEntropyLoss()
+                adversary = LinfPGDAttack(net, criterion, eps=0.031, nb_iter=10, eps_iter=0.007)
+                adversary_2 = SparseL1DescentAttack(net, criterion) 
+                
+                # Regular test
+                net.eval()
+                test_loss = 0
+                correct = 0
+                total = 0
+                for batch_idx, (inputs, targets) in enumerate(testloader):
+                    inputs, targets = inputs.to(device), targets.to(device)
+                    with torch.no_grad():
+                        outputs = net(inputs)
+                        loss = criterion(outputs, targets)
 
-    for epoch in range(200):
-        file_pattern = f'model_epoch_{epoch}.pth'
-        if file_pattern in files:
-            checkpoint_path = os.path.join(directory, file_pattern)
-            print(f'Testing checkpoint: {file_pattern}')
-            
-            # Load the checkpoint
-            checkpoint = torch.load(checkpoint_path)
-            net.load_state_dict(checkpoint['net'])
-            
-            # Define adversarial attacks
-            criterion = nn.CrossEntropyLoss()
-            adversary = LinfPGDAttack(net, criterion, eps=0.031, nb_iter=10, eps_iter=0.007)
-            adversary_2 = SparseL1DescentAttack(net, criterion) 
-            
-            # Call the test function with the model and adversaries
-            test(net, adversary, adversary_2, criterion)
+                        test_loss += loss.item()
+                        _, predicted = outputs.max(1)
+                        total += targets.size(0)
+                        correct += predicted.eq(targets).sum().item()
 
+                        progress_bar(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
+                                     % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
+                regular_acc = 100. * correct / total
 
+                # Adversarial test 1
+                test_loss = 0
+                correct = 0
+                total = 0
+                for batch_idx, (inputs, targets) in enumerate(testloader):
+                    inputs, targets = inputs.to(device), targets.to(device)
+                    net.train()  # Set to train mode to allow gradients for adversary
+                    inputs = adversary.perturb(inputs, targets)
+                    net.eval()  # Switch back to evaluation mode
+                    
+                    with torch.no_grad():
+                        outputs = net(inputs)
+                        loss = criterion(outputs, targets)
 
-loop_model_checkpoints("./checkpoint/resnet18_adversarial_training_20241020_220851/")
+                        test_loss += loss.item()
+                        _, predicted = outputs.max(1)
+                        total += targets.size(0)
+                        correct += predicted.eq(targets).sum().item()
+
+                        progress_bar(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
+                                     % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
+                adv_acc_1 = 100. * correct / total
+
+                # Adversarial test 2
+                test_loss = 0
+                correct = 0
+                total = 0
+                for batch_idx, (inputs, targets) in enumerate(testloader):
+                    inputs, targets = inputs.to(device), targets.to(device)
+                    inputs = adversary_2.perturb(inputs, targets)
+                    
+                    with torch.no_grad():
+                        outputs = net(inputs)
+                        loss = criterion(outputs, targets)
+
+                        test_loss += loss.item()
+                        _, predicted = outputs.max(1)
+                        total += targets.size(0)
+                        correct += predicted.eq(targets).sum().item()
+
+                        progress_bar(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
+                                     % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
+                adv_acc_2 = 100. * correct / total
+
+                # Write results to CSV
+                writer.writerow([epoch, regular_acc, adv_acc_1, adv_acc_2])
+
+loop_model_checkpoints("./checkpoint/resnet18_adversarial_training_20241021_215311/")
 
