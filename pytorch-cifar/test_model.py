@@ -96,6 +96,7 @@ def loop_model_checkpoints(directory):
         writer.writerow(["Epoch", "Regular Accuracy (%)", "LinfPGD Accuracy (%)", "DeepfoolLinf Accuracy (%)"])
 
         files = ["best_regular_model.pth", "best_combined_model.pth", "best_adv_model.pth"]
+        # files = ["best_regular_model.pth"]
 
 
         for file in files:
@@ -111,10 +112,10 @@ def loop_model_checkpoints(directory):
             
             # Define adversarial attacks
             criterion = nn.CrossEntropyLoss()
-            adversary_2 = LinfPGDAttack(net, criterion, eps=0.031, nb_iter=10, eps_iter=0.007)
-            # adversary_2 = DeepfoolLinfAttack(net, 10, nb_iter=50, eps=0.031, loss_fn=criterion)
+            adversary = LinfPGDAttack(net, criterion, eps=0.05, nb_iter=20, eps_iter=0.01)
+            adversary_2 = DeepfoolLinfAttack(net, 10, nb_iter=50, eps=0.031, loss_fn=criterion)
             # adversary_2 = L2PGDAttack(net, criterion, eps = 0.031, nb_iter=10, eps_iter=0.007)
-            adversary = SpatialTransformAttack(net, num_classes=10, loss_fn=criterion)
+            # adversary = SpatialTransformAttack(net, num_classes=10, loss_fn=criterion)
             
             # Regular test
             test_loss = 0
@@ -185,6 +186,7 @@ def loop_model_checkpoints(directory):
             writer.writerow([file, regular_acc, adv_acc_1, adv_acc_2])
 
 # loop_model_checkpoints("./checkpoint/resnet18_clean/")
-loop_model_checkpoints("./checkpoint/resnet18_adversarial_LinfPGD/")
+loop_model_checkpoints("./checkpoint/resnet18_adversarial_training_gradientsign_20241027_173813/")
+# loop_model_checkpoints("./checkpoint/resnet18_clean_20241024_071233/")
 
 # benchmark_resnet18_advtrain()
