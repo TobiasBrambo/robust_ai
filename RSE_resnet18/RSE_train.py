@@ -1,22 +1,24 @@
 
 '''Train CIFAR10 with PyTorch.'''
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-import torch.backends.cudnn as cudnn
+import argparse
+import csv
+from datetime import datetime
+import os
+import os
+import time
 
+from advertorch.attacks import GradientSignAttack, LinfPGDAttack
+import numpy as np
+import torch
+import torch.backends.cudnn as cudnn
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 
-import os
-import argparse
-
 from resnet_RSE import ResNet18
 from utils import progress_bar
-
-from advertorch.attacks import LinfPGDAttack, GradientSignAttack
-import numpy as np
 
 
 parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Training')
@@ -58,7 +60,7 @@ classes = ('plane', 'car', 'bird', 'cat', 'deer',
 
 # Model
 print('==> Building model..')
-net = ResNet18()
+net = ResNet18(std_devs=(0.1,0.1))
 net = net.to(device)
 if device == 'cuda':
     net = torch.nn.DataParallel(net)
@@ -68,10 +70,10 @@ if args.resume:
     # Load checkpoint.
     print('==> Resuming from checkpoint..')
     assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
-    checkpoint = torch.load('./checkpoint/resnet18_adversarial_training/ckpt.pth')
-    net.load_state_dict(checkpoint['net'])
-    best_acc = checkpoint['acc']
-    start_epoch = checkpoint['epoch']
+    checkpoint = torch.load('./checkpoint/resnet18_RSE/best_regular_model.pth')
+    net.load_state_dict(checkpoint)
+    best_acc = 0
+    start_epoch = 109
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=args.lr,
@@ -83,14 +85,11 @@ scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 # adversary = LinfPGDAttack(net, criterion, eps=0.04, nb_iter=10, eps_iter=0.007)
 # adversary = GradientSignAttack(net, criterion)
 
-import csv
-import time
-import os
-from datetime import datetime
+
 
 # Create a unique checkpoint directory to avoid overwriting previous runs
 current_time = datetime.now().strftime('%Y%m%d_%H%M%S')
-checkpoint_dir = f'./checkpoint/resnet18_RSE'
+checkpoint_dir = f'./checkpoint/resnet18_RSE_init01_inner01'
 os.makedirs(checkpoint_dir, exist_ok=True)
 
 csv_file_path = os.path.join(checkpoint_dir, 'training_results.csv')
@@ -183,6 +182,11 @@ with open(csv_file_path, 'w', newline='') as csvfile:
     writer = csv.writer(csvfile)
     writer.writerow(['Epoch', 'Train_Acc', 'Clean_Test_Acc', 'Train_Time', 'Clean_Test_Time'])
 
+# Define early stopping parameters
+patience = 20  # Number of epochs to wait for improvement before stopping
+early_stop_counter = 0
+best_val_acc = 0  # Track the best validation accuracy
+
 for epoch in range(start_epoch, start_epoch + 200):
     train_acc, train_time = train(epoch)
     clean_test_acc, clean_test_time = test(epoch)
@@ -192,4 +196,15 @@ for epoch in range(start_epoch, start_epoch + 200):
     with open(csv_file_path, 'a', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow([epoch, train_acc, clean_test_acc, train_time, clean_test_time])
+
+    # Early stopping logic
+    if clean_test_acc > best_val_acc:
+        best_val_acc = clean_test_acc
+        early_stop_counter = 0  # Reset counter if there is improvement
+    else:
+        early_stop_counter += 1
+
+    if early_stop_counter >= patience:
+        print(f'Early stopping at epoch {epoch}. No improvement for {patience} epochs.')
+        break
 
