@@ -18,47 +18,36 @@ class AddGaussianNoise(nn.Module):
 class RSE(nn.Module):
     def __init__(self, model, std_devs=(0.1, 0.05)):
         super(RSE, self).__init__()
-        self.model = self.add_noise_layers(model, std_devs)
+        self.init_noise = std_devs[0]
+        self.inner_noise = std_devs[1]
+        self.model = self.add_noise_layers(model)
 
-    def add_noise_layers(self, module, std_devs):
-        """
-        Recursively add noise layers before each Conv2d layer in the model.
-        """
-        init_noise, inner_noise = std_devs
-        is_first_conv = True  # Track the first Conv2d layer
+    def add_noise_layers(self, model):
+        for child_name, child in model.named_children():
+            if child_name == "downsample":
+                continue
+            if isinstance(child, nn.Conv2d):
+                setattr(model, child_name, nn.Sequential(
+                    AddGaussianNoise(self.inner_noise),
+                    child
+                ))
+            else:
+                self.add_noise_layers(child)
 
-        def add_noise_recursive(submodule):
-            nonlocal is_first_conv
-            layers = []
-            for name, layer in submodule.named_children():
-                if isinstance(layer, nn.Conv2d):
-                    # Add noise layer before the Conv2d layer
-                    noise_std = init_noise if is_first_conv else inner_noise
-                    layers.append(AddGaussianNoise(noise_std))
-                    is_first_conv = False  # Set flag to False after first Conv2d layer
-                    layers.append(layer)
-                elif isinstance(layer, nn.Sequential) or len(list(layer.children())) > 0:
-                    # Recurse if we have nested modules
-                    layers.append(add_noise_recursive(layer))
-                else:
-                    # Otherwise, add the layer as is
-                    layers.append(layer)
-            return nn.Sequential(*layers)
-
-        # Start the recursive process
-        return add_noise_recursive(module)
+        return model
 
     def forward(self, x):
         return self.model(x)
 
 
 if __name__ == "__main__":
-    from torchvision.models import resnet18
+    from torchvision.models import resnext50_32x4d
 
-    model = resnet18()
+    model = resnext50_32x4d()
     print(model)
-    wrapped_model = RSE(model)
+    wrapped_model = RSE(model, std_devs=(0.1,0.1))
     print(wrapped_model)
 
     input_tensor = torch.randn(1, 3, 224, 224)
     output = wrapped_model(input_tensor)
+    print(output.shape)
