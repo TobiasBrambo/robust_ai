@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -20,6 +21,7 @@ class RSE(nn.Module):
         super(RSE, self).__init__()
         self.init_noise = std_devs[0]
         self.inner_noise = std_devs[1]
+        self.did_first_noise = False
         self.model = self.add_noise_layers(model)
 
     def add_noise_layers(self, model):
@@ -27,10 +29,12 @@ class RSE(nn.Module):
             if child_name == "downsample":
                 continue
             if isinstance(child, nn.Conv2d):
-                setattr(model, child_name, nn.Sequential(
-                    AddGaussianNoise(self.inner_noise),
-                    child
-                ))
+                noise = self.init_noise if not self.did_first_noise else self.inner_noise
+                setattr(model, child_name, nn.Sequential(OrderedDict([
+                    (f"{'init_noise' if not self.did_first_noise else 'inner_noise'}", AddGaussianNoise(noise)),
+                    ('conv', child)
+                ])))
+                self.did_first_noise = True
             else:
                 self.add_noise_layers(child)
 
@@ -41,9 +45,9 @@ class RSE(nn.Module):
 
 
 if __name__ == "__main__":
-    from torchvision.models import resnext50_32x4d
+    from torchvision.models import resnext50_32x4d, resnet18
 
-    model = resnext50_32x4d()
+    model = resnet18()
     print(model)
     wrapped_model = RSE(model, std_devs=(0.1,0.1))
     print(wrapped_model)
