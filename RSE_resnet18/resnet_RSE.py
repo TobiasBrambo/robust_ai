@@ -65,7 +65,6 @@ class Bottleneck(nn.Module):
     def __init__(self, in_planes, planes, stride=1, noise_std=0.1, skip_noise:bool = False):
         super(Bottleneck, self).__init__()
 
-        self.noise_mean = noise_mean
         self.noise_std = noise_std
         self.skip_noise = skip_noise
 
@@ -116,6 +115,7 @@ class ResNet(nn.Module):
         super(ResNet, self).__init__()
         self.init_noise = std_devs[0]
         self.inner_noise = std_devs[1]
+        self.skip_noise = False
         self.in_planes = 64
 
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3,
@@ -131,11 +131,19 @@ class ResNet(nn.Module):
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
         for stride in strides:
-            layers.append(block(self.in_planes, planes, stride))
+            layers.append(block(self.in_planes, planes, stride, noise_std=self.inner_noise))
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
 
+    def add_gaussian_noise(self, x):
+        if not self.skip_noise:
+            noise = dist.Normal(0, self.init_noise).sample(x.size()).to(x.device)
+            return x + noise
+        return x
+
+
     def forward(self, x):
+        x = self.add_gaussian_noise(x)
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         out = self.layer2(out)
@@ -147,8 +155,8 @@ class ResNet(nn.Module):
         return out
 
 
-def ResNet18():
-    return ResNet(BasicBlock, [2, 2, 2, 2])
+def ResNet18(std_devs = (0.2, 0.1)):
+    return ResNet(BasicBlock, [2, 2, 2, 2], std_devs = std_devs)
 
 
 def ResNet34():
