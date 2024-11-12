@@ -17,6 +17,74 @@ from utils import progress_bar
 from advertorch.attacks import LinfPGDAttack, GradientSignAttack, L1PGDAttack, L2PGDAttack, DeepfoolLinfAttack
 import numpy as np
 
+from torch.utils.data import Dataset
+from PIL import Image
+import os
+import random
+
+class AdversarialDataset(Dataset):
+    def __init__(self, root_dir, transform=None):
+        """
+        Args:
+            root_dir (string): Directory with all the adversarial images.
+            transform (callable, optional): Transform to be applied on an image.
+        """
+        self.root_dir = root_dir
+        self.image_files = sorted(os.listdir(root_dir))  # Sort to maintain order
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def __getitem__(self, idx):
+        img_path = os.path.join(self.root_dir, self.image_files[idx])
+        image = Image.open(img_path).convert("RGB")  # Open and convert to RGB
+        label = int(self.image_files[idx].split('_')[-1].split('.')[0])  # Assuming label is encoded in filename
+
+
+        if self.transform:
+            image = self.transform(image)
+
+        return image, label
+
+def create_adversarial_loaders(base_dir, batch_size=128, num_workers=2):
+    """
+    Args:
+        base_dir (string): The base directory containing model-specific adversarial subdirectories.
+        batch_size (int): Batch size for the DataLoader.
+        num_workers (int): Number of worker threads for data loading.
+    
+    Returns:
+        dict: A dictionary of DataLoader objects, keyed by `<model>/<attack>`.
+    """
+    # Define transformations
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
+
+    # Dictionary to store loaders
+    loaders = []
+
+    # Walk through the directory structure
+    for model_name in os.listdir(base_dir):
+        model_dir = os.path.join(base_dir, model_name)
+        print(model_dir)
+        if not os.path.isdir(model_dir):
+            continue  # Skip non-directory entries
+        
+        for attack_name in os.listdir(model_dir):
+            attack_dir = os.path.join(model_dir, attack_name)
+            if not os.path.isdir(attack_dir):
+                continue  # Skip non-directory entries
+            
+            # Create a DataLoader for this attack
+            dataset = AdversarialDataset(root_dir=attack_dir, transform=transform)
+            loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+
+            loaders.append(loader)
+
+    return loaders
 
 parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Training')
 parser.add_argument('--lr', default=0.1, type=float, help='learning rate')
@@ -47,6 +115,17 @@ trainset = torchvision.datasets.CIFAR10(
 trainloader = torch.utils.data.DataLoader(
     trainset, batch_size=128, shuffle=True, num_workers=2)
 
+
+
+base_dir = "./data/perturbed_train"  # Base directory containing adversarial data
+train_loaders = create_adversarial_loaders(base_dir)
+train_loaders.append(trainloader)
+print(len(train_loaders))
+for loader in train_loaders:
+    print(len(loader))
+
+
+
 testset = torchvision.datasets.CIFAR10(
     root='./data', train=False, download=True, transform=transform_test)
 testloader = torch.utils.data.DataLoader(
@@ -58,36 +137,11 @@ classes = ('plane', 'car', 'bird', 'cat', 'deer',
 # Model
 print('==> Building model..')
 net = ResNet18().to(device)
-resnet50_clean = ResNet50().to(device)
-lenet_clean = LeNet().to(device)
-simpledla_clean = SimpleDLA().to(device)
-vgg19_clean = VGG('VGG19').to(device)
-densenet121_clean = DenseNet121().to(device)
-densenet201_clean = DenseNet201().to(device)
 
 if device == 'cuda':
     net = torch.nn.DataParallel(net)
-    resnet50_clean = torch.nn.DataParallel(resnet50_clean)
-    lenet_clean = torch.nn.DataParallel(lenet_clean)
-    simpledla_clean = torch.nn.DataParallel(simpledla_clean)
-    vgg19_clean = torch.nn.DataParallel(vgg19_clean)
-    densenet121_clean = torch.nn.DataParallel(densenet121_clean)
-    densenet201_clean = torch.nn.DataParallel(densenet201_clean)
     cudnn.benchmark = True
 
-resnet50_check = torch.load('./checkpoint/resnet50_clean/best_regular_model.pth')
-lenet_check = torch.load('./checkpoint/LeNet_clean/best_regular_model (1).pth')
-simpledla_check = torch.load('./checkpoint/SimpleDLA_clean/best_regular_model (1).pth')
-# vgg19_check = torch.load('./checkpoint/VGG19_clean/best_regular_model.pth')
-densenet121_check = torch.load('./checkpoint/DenseNet121_clean/best_regular_model.pth')
-# densenet201_check = torch.load('./checkpoint/DenseNet201_clean/best_regular_model.pth')
-
-resnet50_clean.load_state_dict(resnet50_check)
-lenet_clean.load_state_dict(lenet_check)
-simpledla_clean.load_state_dict(simpledla_check)
-# vgg19_clean.load_state_dict(vgg19_check)
-densenet121_clean.load_state_dict(densenet121_check)
-# densenet201_clean.load_state_dict(densenet201_check)
 
 
 if args.resume:
@@ -104,20 +158,7 @@ optimizer = optim.SGD(net.parameters(), lr=args.lr,
                       momentum=0.9, weight_decay=5e-4)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
-adversaries = [
-    LinfPGDAttack(resnet50_clean, criterion, eps=0.031, nb_iter=10, eps_iter=0.007),
-    LinfPGDAttack(lenet_clean, criterion, eps=0.031, nb_iter=10, eps_iter=0.007),
-    GradientSignAttack(simpledla_clean, criterion),
-    # GradientSignAttack(vgg19_clean, criterion),
-    LinfPGDAttack(densenet121_clean, criterion, eps=0.031, nb_iter=10, eps_iter=0.007),
-    GradientSignAttack(densenet201_clean, criterion),
-    L1PGDAttack(resnet50_clean, criterion, eps=0.031, nb_iter=10, eps_iter=0.007),
-    L2PGDAttack(lenet_clean, criterion, eps=0.031, nb_iter=10, eps_iter=0.007),
-    DeepfoolLinfAttack(simpledla_clean, num_classes=10, nb_iter=50, eps=0.031, loss_fn=criterion),
-    # L1PGDAttack(vgg19_clean, criterion, eps=0.031, nb_iter=10, eps_iter=0.007),
-    L2PGDAttack(densenet121_clean, criterion, eps=0.031, nb_iter=10, eps_iter=0.007),
-    # DeepfoolLinfAttack(densenet201_clean, num_classes=10, nb_iter=50, eps=0.031, loss_fn=criterion)
-]
+
 
 import csv
 import time
@@ -126,7 +167,7 @@ from datetime import datetime
 
 # Create a unique checkpoint directory to avoid overwriting previous runs
 current_time = datetime.now().strftime('%Y%m%d_%H%M%S')
-checkpoint_dir = f'./checkpoint/resnet18_singlemodel_EAT'
+checkpoint_dir = f'./checkpoint/resnet18_singlemodel_EAT_premade_data_actually20cleanfirst'
 os.makedirs(checkpoint_dir, exist_ok=True)
 
 csv_file_path = os.path.join(checkpoint_dir, 'training_results.csv')
@@ -136,6 +177,7 @@ best_adv_acc = 0
 best_combined_acc = 0
 
 
+
 def train(epoch):
     print('\nEpoch: %d' % epoch)
     net.train()
@@ -143,30 +185,39 @@ def train(epoch):
     correct = 0
     total = 0
     start_time = time.time()
-    for batch_idx, (inputs, targets) in enumerate(trainloader):
+    
+    # Synchronize iterators across all loaders
+    iterators = [iter(loader) for loader in train_loaders]
+    
+    for batch_idx in range(len(train_loaders[0])):  # All loaders have the same length
+        # Advance all iterators to maintain synchronization
+        batches = [next(iterator) for iterator in iterators]  # Load the current batch from all loaders
+        
+        # Randomly pick which batch to use for this iteration
+        if epoch < 20:
+            selected_loader_index = -1
+        else:
+            selected_loader_index = random.randint(0, len(train_loaders) - 1)
+        inputs, targets = batches[selected_loader_index]
         inputs, targets = inputs.to(device), targets.to(device)
-        if epoch >= 10 and np.random.random() < 0.5:
-            adversary = np.random.choice(adversaries)
-            adversary.eval()
-            adversary_model = adversary.predict(inputs, targets)
-            inputs = adversary_model
+        
         optimizer.zero_grad()
         outputs = net(inputs)
         loss = criterion(outputs, targets)
         loss.backward()
         optimizer.step()
-
+        
         train_loss += loss.item()
         _, predicted = outputs.max(1)
         total += targets.size(0)
         correct += predicted.eq(targets).sum().item()
-
-        progress_bar(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
+        
+        progress_bar(batch_idx, len(train_loaders[0]), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                      % (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
-
+    
     train_acc = 100. * correct / total
     train_time = time.time() - start_time
-
+    
     return train_acc, train_time
 
 def test(epoch):
@@ -202,7 +253,7 @@ def test(epoch):
         best_acc = test_acc
 
     # Save model after every epoch
-    torch.save(net.state_dict(), os.path.join(checkpoint_dir, f'model_epoch_{epoch}.pth'))
+    # torch.save(net.state_dict(), os.path.join(checkpoint_dir, f'model_epoch_{epoch}.pth'))
 
     return test_acc, test_time
 

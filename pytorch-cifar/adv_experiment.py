@@ -14,7 +14,7 @@ import argparse
 from models import *
 from utils import progress_bar
 
-from advertorch.attacks import LinfPGDAttack, GradientSignAttack
+from advertorch.attacks import LinfPGDAttack, GradientSignAttack, DeepfoolLinfAttack
 import numpy as np
 
 
@@ -79,8 +79,10 @@ scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
 # params based on: https://github.com/BorealisAI/advertorch/issues/76#issuecomment-692436644
 # adversary = LinfPGDAttack(net, criterion, eps=0.031, nb_iter=10, eps_iter=0.007)
-# adversary = LinfPGDAttack(net, criterion, eps=0.04, nb_iter=10, eps_iter=0.007)
-adversary = GradientSignAttack(net, criterion)
+# adversary = LinfPGDAttack(net, criterion, eps=0.05, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3)
+# adversary = GradientSignAttack(net, criterion, clip_min=-3, clip_max=3)
+# adversary = LinfPGDAttack(net, criterion, eps=0.1, nb_iter=20, eps_iter=0.01)
+adversary = DeepfoolLinfAttack(net, loss_fn=criterion, num_classes=10, nb_iter=10, eps=0.05, clip_min=-3, clip_max=3)
 
 import csv
 import time
@@ -89,7 +91,7 @@ from datetime import datetime
 
 # Create a unique checkpoint directory to avoid overwriting previous runs
 current_time = datetime.now().strftime('%Y%m%d_%H%M%S')
-checkpoint_dir = f'./checkpoint/resnet18_adversarial_training_gradientsign_default_params'
+checkpoint_dir = f'./checkpoint/resnet18_adversarial_training_DeepfoolLinf_eps005_nbiter10_fixedclip'
 os.makedirs(checkpoint_dir, exist_ok=True)
 
 csv_file_path = os.path.join(checkpoint_dir, 'training_results.csv')
@@ -204,7 +206,7 @@ def test(epoch):
         best_combined_acc = combined_acc
 
     # Save model after every epoch
-    torch.save(net.state_dict(), os.path.join(checkpoint_dir, f'model_epoch_{epoch}.pth'))
+    # torch.save(net.state_dict(), os.path.join(checkpoint_dir, f'model_epoch_{epoch}.pth'))
 
     return test_acc, test_time, adv_test_acc, adv_test_time
 

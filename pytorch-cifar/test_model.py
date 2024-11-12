@@ -15,7 +15,7 @@ import argparse
 from models import *
 from utils import progress_bar
 
-from advertorch.attacks import LinfPGDAttack, CarliniWagnerL2Attack, SparseL1DescentAttack, DeepfoolLinfAttack, L2PGDAttack, SpatialTransformAttack
+from advertorch.attacks import LinfPGDAttack, CarliniWagnerL2Attack, SparseL1DescentAttack, DeepfoolLinfAttack, L2PGDAttack, SpatialTransformAttack, GradientSignAttack
 import numpy as np
 import time
 import os
@@ -93,10 +93,10 @@ def loop_model_checkpoints(directory):
     csv_file = os.path.join(directory, "test_results.csv")
     with open(csv_file, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(["Epoch", "Regular Accuracy (%)", "LinfPGD Accuracy (%)", "DeepfoolLinf Accuracy (%)"])
+        writer.writerow(["Epoch", "Regular Accuracy (%)", "GradientSignAttack Accuracy (%)","LinfPGD Accuracy (%)", "DeepfoolLinf Accuracy (%)"])
 
-        files = ["best_regular_model.pth", "best_combined_model.pth", "best_adv_model.pth"]
-        # files = ["best_regular_model.pth"]
+        # files = ["best_regular_model.pth", "best_combined_model.pth", "best_adv_model.pth"]
+        files = ["best_regular_model.pth"]
 
 
         for file in files:
@@ -112,8 +112,9 @@ def loop_model_checkpoints(directory):
             
             # Define adversarial attacks
             criterion = nn.CrossEntropyLoss()
-            adversary = LinfPGDAttack(net, criterion, eps=0.05, nb_iter=20, eps_iter=0.01)
-            adversary_2 = DeepfoolLinfAttack(net, 10, nb_iter=50, eps=0.031, loss_fn=criterion)
+            adversary = GradientSignAttack(net, criterion)
+            adversary_2 = LinfPGDAttack(net, criterion, eps=0.1, nb_iter=20, eps_iter=0.01)
+            adversary_3 = DeepfoolLinfAttack(net, 10, nb_iter=10, eps=0.05, loss_fn=criterion)
             # adversary_2 = L2PGDAttack(net, criterion, eps = 0.031, nb_iter=10, eps_iter=0.007)
             # adversary = SpatialTransformAttack(net, num_classes=10, loss_fn=criterion)
             
@@ -182,11 +183,43 @@ def loop_model_checkpoints(directory):
                                  % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
             adv_acc_2 = 100. * correct / total
 
+            # Adversarial test 3
+            test_loss = 0
+            correct = 0
+            total = 0
+            for batch_idx, (inputs, targets) in enumerate(testloader):
+                inputs, targets = inputs.to(device), targets.to(device)
+                net.train()
+                inputs = adversary_3.perturb(inputs, targets)
+                net.eval()
+                
+                with torch.no_grad():
+                    outputs = net(inputs)
+                    loss = criterion(outputs, targets)
+
+                    test_loss += loss.item()
+                    _, predicted = outputs.max(1)
+                    total += targets.size(0)
+                    correct += predicted.eq(targets).sum().item()
+
+                    progress_bar(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
+                                 % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
+            adv_acc_3 = 100. * correct / total
+
+            
             # Write results to CSV
-            writer.writerow([file, regular_acc, adv_acc_1, adv_acc_2])
+            writer.writerow([file, regular_acc, adv_acc_1, adv_acc_2, adv_acc_3])
 
 # loop_model_checkpoints("./checkpoint/resnet18_clean/")
-loop_model_checkpoints("./checkpoint/resnet18_adversarial_training_gradientsign_20241027_173813/")
+
+models = [
+    "resnet18_adversarial_training_gradientsign_default_params",
+    "resnet18_adversarial_training_LinfPGD_eps0.1_nbiter20_epsiter0.01",
+    "resnet18_adversarial_training_deepfool_nbiter10_eps_005"
+]
+
+for model in models:
+    loop_model_checkpoints(f"./checkpoint/{model}/")
 # loop_model_checkpoints("./checkpoint/resnet18_clean_20241024_071233/")
 
 # benchmark_resnet18_advtrain()

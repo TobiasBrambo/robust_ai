@@ -166,3 +166,4 @@ trained_models/*
 pytorch-cifar/checkpoint/*
 pytorch-cifar/data/*
 RSE_resnet18/data/*
+RSE_resnet18/checkpoint/*
