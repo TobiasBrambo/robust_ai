@@ -1,3 +1,6 @@
 Squeezer,Adversarial Attack,Legitimate Accuracy,Adversarial Detection Rate
 4-bit_newmean,None,0.912,N/A
-4-bit_newmean,LinfPGD,0.0,1.0
+4-bit_newmean,LinfPGD,0.048585394756332397,0.3249
+4-bit_newmean,Deepfool,0.14575866188769415,0.9163
+4-bit_newmean,FGSM,0.3421663442940039,0.483
+5-bit_newmean,None,0.9403,N/A

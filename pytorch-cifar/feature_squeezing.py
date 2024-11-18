@@ -3,6 +3,7 @@ from tqdm import tqdm
 import numpy as np
 import cv2
 from scipy.ndimage import median_filter
+import torch.nn as nn
 
 from advertorch.attacks import (
     DeepfoolLinfAttack,
@@ -86,11 +87,12 @@ def non_local_means_batch(batch, h=10, template_window_size=7, search_window_siz
 def feature_squeezing_pipeline(model, input_batch, squeezers, threshold):
     model.eval()
     distances = []
+    m = nn.Softmax()
     with torch.no_grad():
-        original_prediction = model(input_batch)
+        original_prediction = m(model(input_batch))
         for squeezer in squeezers:
             squeezed_batch = squeezer(input_batch)
-            squeezed_prediction = model(squeezed_batch)
+            squeezed_prediction = m(model(squeezed_batch))
             batch_distances = F.l1_loss(original_prediction, squeezed_prediction, reduction='none').view(input_batch.size(0), -1).sum(dim=1)
             distances.append(batch_distances)
     max_distances = torch.stack(distances, dim=1).max(dim=1).values
@@ -104,6 +106,7 @@ def evaluate_with_feature_squeezing_grouped(model, loader, squeezers, threshold,
         "correct_legitimate": 0,
         "adversarial_detected": 0,
     }
+
     
     for images, labels in tqdm(loader, desc="Evaluating batches"):
         images, labels = images.cuda(), labels.cuda()
