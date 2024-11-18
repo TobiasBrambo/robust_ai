@@ -17,23 +17,30 @@ import torchvision
 import numpy as np
 
 from models import ResNet18
+from collections import Counter
 
 # Feature Squeezing Functions
-def reduce_color_depth_batch(batch, bit_depth=4):
-    # Unnormalize the image
-    batch = (batch * torch.tensor([0.2023, 0.1994, 0.2010], device=batch.device).view(1, 3, 1, 1)) + \
-            torch.tensor([0.4914, 0.4822, 0.4465], device=batch.device).view(1, 3, 1, 1)
-    batch = torch.clamp(batch, 0, 1)
+def reduce_color_depth_batch(batch, bit_depth=4, new_mean:bool = True):
+    mean = [0.4914, 0.4822, 0.4465]
+    std = [0.2023, 0.1994, 0.2010]
+    batch_unnormalized = batch * torch.tensor(std, device=batch.device).view(1, 3, 1, 1) + torch.tensor(mean, device=batch.device).view(1, 3, 1, 1)
+    batch_unnormalized = torch.clamp(batch_unnormalized, 0, 1)
 
-    # Reduce bit depth
     scale = 2 ** bit_depth - 1
-    batch = torch.round(batch * scale) / scale
+    batch_bit_reduced = torch.round(batch_unnormalized * scale) / scale
 
-    # Renormalize the image
-    batch = (batch - torch.tensor([0.4914, 0.4822, 0.4465], device=batch.device).view(1, 3, 1, 1)) / \
-            torch.tensor([0.2023, 0.1994, 0.2010], device=batch.device).view(1, 3, 1, 1)
+    if new_mean:
+        new_mean = batch_bit_reduced.mean().item()
+        new_std = batch_bit_reduced.std().item()
 
-    return batch
+        batch_renormalized = (batch_bit_reduced - new_mean) / new_std
+
+    else:
+        batch_renormalized = (batch_bit_reduced - torch.tensor(mean, device=batch.device).view(1,3,1,1)) / torch.tensor(std, device=batch.device).view(1,3,1,1)
+
+
+    return batch_renormalized
+
 
 def median_filter_batch(batch, filter_size=3):
     # Unnormalize the image
@@ -52,20 +59,28 @@ def median_filter_batch(batch, filter_size=3):
     return smoothed
 
 def non_local_means_batch(batch, h=10, template_window_size=7, search_window_size=21):
-    batch_np = batch.permute(0, 2, 3, 1).cpu().numpy()
+
+    mean = [0.4914, 0.4822, 0.4465]
+    std = [0.2023, 0.1994, 0.2010]
+    batch_unnormalized = batch * torch.tensor(std, device=batch.device).view(1, 3, 1, 1) + torch.tensor(mean, device=batch.device).view(1, 3, 1, 1)
+    batch_unnormalized = torch.clamp(batch_unnormalized, 0, 1)
+
+
+
+    batch_np = batch_unnormalized.permute(0, 2, 3, 1).cpu().numpy()
     smoothed = []
     for img in batch_np:
         # Unnormalize the image
-        img = (img * np.array([0.2023, 0.1994, 0.2010])) + np.array([0.4914, 0.4822, 0.4465])
-        img = np.clip(img * 255.0, 0, 255).astype(np.uint8)
+        img_uint8 = (img * 255.0).astype(np.uint8)
         smoothed_img = cv2.fastNlMeansDenoisingColored(
-            img, None, h, h, template_window_size, search_window_size
+            img_uint8, None, h, h, template_window_size, search_window_size
         )
         smoothed.append(smoothed_img / 255.0)
     smoothed = np.stack(smoothed)
-    # Renormalize the image
-    smoothed = (smoothed / 255.0 - np.array([0.4914, 0.4822, 0.4465])) / np.array([0.2023, 0.1994, 0.2010])
-    return torch.tensor(smoothed, dtype=torch.float).permute(0, 3, 1, 2).to(batch.device)
+    smoothed_tensor = torch.tensor(smoothed, dtype=torch.float).permute(0, 3, 1, 2).to(batch.device)
+
+    batch_renormalized = (smoothed_tensor - torch.tensor(mean, device=batch.device).view(1, 3, 1, 1)) / torch.tensor(std, device=batch.device).view(1, 3, 1, 1)
+    return batch_renormalized
 
 # Feature Squeezing Pipeline
 def feature_squeezing_pipeline(model, input_batch, squeezers, threshold):
@@ -135,10 +150,12 @@ individual_squeezers = [
     # {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=1)], "threshold": 1.9997, "name": "1-bit"},
     # {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=2)], "threshold": 1.9967, "name": "2-bit"},
     # {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=3)], "threshold": 1.7822, "name": "3-bit"},
-    {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=4)], "threshold": 0.7930, "name": "4-bit"},
-    {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=5)], "threshold": 0.3301, "name": "5-bit"},
-    {"squeezer": [lambda batch: median_filter_batch(batch, filter_size=2)], "threshold": 1.1296, "name": "Median 2x2"},
-    {"squeezer": [lambda batch: median_filter_batch(batch, filter_size=3)], "threshold": 1.9431, "name": "Median 3x3"},
+    # {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=4, new_mean=False)], "threshold": 0.7930, "name": "4-bit"},
+    # {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=5, new_mean=False)], "threshold": 0.3301, "name": "5-bit"},
+    # {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=4, new_mean=True)], "threshold": 0.7930, "name": "4-bit_newmean"},
+    # {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=5, new_mean=True)], "threshold": 0.3301, "name": "5-bit_newmean"},
+    # {"squeezer": [lambda batch: median_filter_batch(batch, filter_size=2)], "threshold": 1.1296, "name": "Median 2x2"},
+    # {"squeezer": [lambda batch: median_filter_batch(batch, filter_size=3)], "threshold": 1.9431, "name": "Median 3x3"},
     {"squeezer": [lambda batch: non_local_means_batch(batch, h=2, template_window_size=3, search_window_size=11)], "threshold": 0.2770, "name": "NLM 11-3-2"},
     {"squeezer": [lambda batch: non_local_means_batch(batch, h=4, template_window_size=3, search_window_size=11)], "threshold": 0.7537, "name": "NLM 11-3-4"},
     {"squeezer": [lambda batch: non_local_means_batch(batch, h=2, template_window_size=3, search_window_size=13)], "threshold": 0.2910, "name": "NLM 13-3-2"},
@@ -175,7 +192,7 @@ test_loader = DataLoader(
 )
 
 if __name__ == "__main__":
-    with open("feature_squeezing_results_fixed_normalization.csv", mode="w", newline="") as csvfile:
+    with open("feature_squeezing_results_new_methods.csv", mode="w", newline="") as csvfile:
         fieldnames = ["Squeezer", "Adversarial Attack", "Legitimate Accuracy", "Adversarial Detection Rate"]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
