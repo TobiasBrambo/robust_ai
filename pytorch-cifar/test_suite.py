@@ -1,4 +1,4 @@
-import argparse
+import argparseG
 import csv
 from datetime import datetime
 import os
@@ -89,7 +89,7 @@ def reset_bn_stats(model, dataloader, device):
 
 
 
-def test_loop(net, adversary = None, num_tests_per_batch:int = 10, set_train_for_gen: bool = True):
+def test_loop(net, adversary = None, set_train_for_gen: bool = True):
 
     test_loss = 0
     correct = 0
@@ -163,9 +163,9 @@ def loop_model_checkpoints(directory):
         adversary_7 = SinglePixelAttack(net, loss_fn=criterion, max_pixels=10, clip_min=-3, clip_max=3)
         adversary_8 = LinfPGDAttack(net, criterion, eps=0.3, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3)
         adversary_9 = L1PGDAttack(net, criterion, eps=0.05, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3)
+        adversary_10 = SinglePixelAttack(net, loss_fn=criterion, max_pixels=50, clip_min=-3, clip_max=3)
         
 
-        num_tests_per_batch = 10
 
         writer.writerow(["Epoch", "Regular Accuracy (%)", 
                          "LinfPGD  eps005 nbiter10 epsiter 001 Accuracy (%)",
@@ -176,24 +176,26 @@ def loop_model_checkpoints(directory):
                          "SinglePixelAttack maxpixels1 Accuracy (%)",
                          "SinglePixelAttack maxpixels10 Accuracy (%)",
                          "LinfPGD  eps03 nbiter10 epsiter001 Accuracy (%)",
-                         "L1PGD eps005 nbiter10 epsiter001 Accuracy (%)",])
+                         "L1PGD eps005 nbiter10 epsiter001 Accuracy (%)",
+                         "SinglePixelAttack maxpixels10 Accuracy (%)",])
         
-        regular_acc = test_loop(net, adversary=None, num_tests_per_batch=num_tests_per_batch)
+        regular_acc = test_loop(net, adversary=None)
 
-        adv_acc_1 = test_loop(net, adversary=adversary, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
-        adv_acc_2 = test_loop(net, adversary=adversary_2, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
-        adv_acc_3 = test_loop(net, adversary=adversary_3, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
-        adv_acc_4 = test_loop(net, adversary=adversary_4, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
-        adv_acc_5 = test_loop(net ,adversary=adversary_5, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
-        adv_acc_6 = test_loop(net, adversary=adversary_6, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
-        adv_acc_7 = test_loop(net, adversary=adversary_7, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
-        adv_acc_8 = test_loop(net, adversary=adversary_8, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
-        adv_acc_9 = test_loop(net, adversary=adversary_9, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
+        adv_acc_1 = test_loop(net, adversary=adversary, set_train_for_gen=True)
+        adv_acc_2 = test_loop(net, adversary=adversary_2, set_train_for_gen=True)
+        adv_acc_3 = test_loop(net, adversary=adversary_3, set_train_for_gen=True)
+        adv_acc_4 = test_loop(net, adversary=adversary_4, set_train_for_gen=True)
+        adv_acc_5 = test_loop(net ,adversary=adversary_5, set_train_for_gen=True)
+        adv_acc_6 = test_loop(net, adversary=adversary_6, set_train_for_gen=True)
+        adv_acc_7 = test_loop(net, adversary=adversary_7, set_train_for_gen=True)
+        adv_acc_8 = test_loop(net, adversary=adversary_8, set_train_for_gen=True)
+        adv_acc_9 = test_loop(net, adversary=adversary_9, set_train_for_gen=True)
+        adv_acc_10 = test_loop(net, adversary=adversary_10, set_train_for_gen=True)
         
         
 
         # Write results to CSV
-        writer.writerow([file, regular_acc, adv_acc_1, adv_acc_2, adv_acc_3, adv_acc_4, adv_acc_5, adv_acc_6, adv_acc_7, adv_acc_8, adv_acc_9])
+        writer.writerow([file, regular_acc, adv_acc_1, adv_acc_2, adv_acc_3, adv_acc_4, adv_acc_5, adv_acc_6, adv_acc_7, adv_acc_8, adv_acc_9, adv_acc_10])
 
 
-loop_model_checkpoints("checkpoint/resnet18_singlemodel_EAT_premade_data_20cleanfirst")
+loop_model_checkpoints("checkpoint/resnet18_clean")

@@ -60,7 +60,7 @@ classes = ('plane', 'car', 'bird', 'cat', 'deer',
 
 # Model
 print('==> Building model..')
-net = ResNet18(std_devs=(0.1,0.1))
+net = ResNet18(std_devs=(0.1,0.05))
 net = net.to(device)
 if device == 'cuda':
     net = torch.nn.DataParallel(net)
@@ -89,7 +89,7 @@ scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
 # Create a unique checkpoint directory to avoid overwriting previous runs
 current_time = datetime.now().strftime('%Y%m%d_%H%M%S')
-checkpoint_dir = f'./checkpoint/resnet18_RSE_init01_inner01'
+checkpoint_dir = f'./checkpoint/resnet18_RSE_SKIP_LAYER_NOISE'
 os.makedirs(checkpoint_dir, exist_ok=True)
 
 csv_file_path = os.path.join(checkpoint_dir, 'training_results.csv')

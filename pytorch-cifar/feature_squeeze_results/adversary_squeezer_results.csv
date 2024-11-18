@@ -1,0 +1,33 @@
+Attack,Squeezer,Accuracy No Squeeze,Accuracy With Squeeze,Detection Rate
+Clean,Bit Depth 5bit,0.9529,0.9527,N/A
+Clean,Bit Depth 4bit,0.9529,0.9515,N/A
+Clean,Median 2x2,0.9529,0.9107,N/A
+Clean,NLM 11-3-4,0.9529,0.1711,N/A
+LinfPGD_eps005_nbiter10_epsiter001,Bit Depth 5bit,0.0904,0.0916,0.0016
+LinfPGD_eps005_nbiter10_epsiter001,Bit Depth 4bit,0.0894,0.0965,0.0074
+LinfPGD_eps005_nbiter10_epsiter001,Median 2x2,0.0874,0.6912,0.6317
+LinfPGD_eps005_nbiter10_epsiter001,NLM 11-3-4,0.0885,0.1226,0.8718
+FGSM_default,Bit Depth 5bit,0.2816,0.282,0.0098
+FGSM_default,Bit Depth 4bit,0.2816,0.2827,0.0165
+FGSM_default,Median 2x2,0.2816,0.3811,0.4219
+FGSM_default,NLM 11-3-4,0.2816,0.1108,0.7698
+DeepfoolLinf_eps005_nbiter10,Bit Depth 5bit,0.1548,0.4053,0.2795
+DeepfoolLinf_eps005_nbiter10,Bit Depth 4bit,0.1548,0.5154,0.3765
+DeepfoolLinf_eps005_nbiter10,Median 2x2,0.1549,0.85,0.7277
+DeepfoolLinf_eps005_nbiter10,NLM 11-3-4,0.155,0.1365,0.8896
+FGSM_eps005,Bit Depth 5bit,0.5275,0.5264,0.0068
+FGSM_eps005,Bit Depth 4bit,0.5275,0.5292,0.0134
+FGSM_eps005,Median 2x2,0.5275,0.7172,0.2572
+FGSM_eps005,NLM 11-3-4,0.5275,0.128,0.8705
+L2PGD_eps005_nbiter10_epsiter001,Bit Depth 5bit,0.9382,0.9396,0.0044
+L2PGD_eps005_nbiter10_epsiter001,Bit Depth 4bit,0.9383,0.9386,0.0072
+L2PGD_eps005_nbiter10_epsiter001,Median 2x2,0.9382,0.9065,0.0772
+L2PGD_eps005_nbiter10_epsiter001,NLM 11-3-4,0.9382,0.1733,0.8251
+LinfPGD_eps03_nbiter10_epsiter001,Bit Depth 5bit,0.0111,0.0113,0.0003
+LinfPGD_eps03_nbiter10_epsiter001,Bit Depth 4bit,0.0114,0.0114,0.0004
+LinfPGD_eps03_nbiter10_epsiter001,Median 2x2,0.0107,0.5147,0.5572
+LinfPGD_eps03_nbiter10_epsiter001,NLM 11-3-4,0.0102,0.0891,0.7561
+L1PGD_eps005_nbiter10_epsiter001,Bit Depth 5bit,0.9506,0.951,0.0021
+L1PGD_eps005_nbiter10_epsiter001,Bit Depth 4bit,0.9506,0.9501,0.0061
+L1PGD_eps005_nbiter10_epsiter001,Median 2x2,0.9506,0.9098,0.0751
+L1PGD_eps005_nbiter10_epsiter001,NLM 11-3-4,0.9506,0.1707,0.8278

@@ -1,0 +1,36 @@
+Squeezer,Adversarial Attack,Legitimate Accuracy,Adversarial Detection Rate
+4-bit,None,0.9296,N/A
+4-bit,LinfPGD,0.06744730679156909,0.3595
+4-bit,Deepfool,0.14533305491751933,0.5211
+4-bit,FGSM,0.2719525350593312,0.073
+5-bit,None,0.9301,N/A
+5-bit,LinfPGD,0.06340057636887608,0.2366
+5-bit,Deepfool,0.16801493466085873,0.5179
+5-bit,FGSM,0.28113098672821696,0.1335
+Median 2x2,None,0.8938,N/A
+Median 2x2,LinfPGD,0.5,0.9998
+Median 2x2,Deepfool,0.1,0.999
+Median 2x2,FGSM,0.8,0.9995
+Median 3x3,None,0.8127,N/A
+Median 3x3,LinfPGD,0.3333333333333333,0.9997
+Median 3x3,Deepfool,0.1,0.998
+Median 3x3,FGSM,0.5,0.9978
+NLM 11-3-2,None,0.1888,N/A
+NLM 11-3-2,LinfPGD,0.0,1.0
+NLM 11-3-2,Deepfool,0.0,1.0
+NLM 11-3-2,FGSM,0.0,1.0
+NLM 11-3-4,None,0.1904,N/A
+NLM 11-3-4,LinfPGD,0.0,1.0
+NLM 11-3-4,Deepfool,0.0,1.0
+NLM 11-3-4,FGSM,0.0,1.0
+NLM 13-3-2,None,0.1888,N/A
+NLM 13-3-2,LinfPGD,0.0,1.0
+NLM 13-3-2,Deepfool,0.0,1.0
+NLM 13-3-2,FGSM,0.0,1.0
+NLM 13-3-4,None,0.1899,N/A
+NLM 13-3-4,LinfPGD,0.0,1.0
+NLM 13-3-4,Deepfool,0.0,1.0
+NLM 13-3-4,FGSM,0.0,1.0
+"Combined (5-bit, Median 2x2, NLM 13-3-2)",LinfPGD,0.0,1.0
+"Combined (5-bit, Median 2x2, NLM 13-3-2)",Deepfool,0.0,1.0
+"Combined (5-bit, Median 2x2, NLM 13-3-2)",FGSM,0.0,1.0
