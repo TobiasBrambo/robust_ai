@@ -6,7 +6,7 @@ import os
 import os
 import time
 
-from advertorch.attacks import DeepfoolLinfAttack, GradientSignAttack, L2PGDAttack, LinfPGDAttack, SinglePixelAttack
+from advertorch.attacks import DeepfoolLinfAttack, GradientSignAttack, L1PGDAttack, L2PGDAttack, LinfPGDAttack, SinglePixelAttack
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
@@ -139,9 +139,9 @@ def test_loop(net, adversary = None, num_tests_per_batch:int = 10, set_train_for
 
 
 
-def loop_model_checkpoints(directory):
+def loop_model_checkpoints(directory, std_devs):
 
-    net = ResNet18()
+    net = ResNet18(std_devs=std_devs)
     
     net = net.to(device)
     if device == 'cuda':
@@ -150,7 +150,7 @@ def loop_model_checkpoints(directory):
 
 
     # Prepare CSV file for results
-    csv_file = os.path.join(directory, "test_results.csv")
+    csv_file = os.path.join(directory, "extra_tests.csv")
     with open(csv_file, mode='w', newline='') as file:
         writer = csv.writer(file)
 
@@ -170,38 +170,58 @@ def loop_model_checkpoints(directory):
         
         # Define adversarial attacks
         criterion = nn.CrossEntropyLoss()
-        adversary = LinfPGDAttack(net, criterion, eps=0.05, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3)
-        adversary_2 = GradientSignAttack(net, criterion, clip_min=-3, clip_max=3)
-        adversary_3 = DeepfoolLinfAttack(net, 10, nb_iter=10, eps=0.05, loss_fn=criterion, clip_min=-3, clip_max=3)
-        adversary_4 = GradientSignAttack(net, criterion, eps=0.05, clip_min=-3, clip_max=3)
-        adversary_5 = L2PGDAttack(net, criterion, eps=0.05, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3)
-        adversary_6 = SinglePixelAttack(net, loss_fn=criterion, max_pixels=1, clip_min=-3, clip_max=3)
-        adversary_7 = SinglePixelAttack(net, loss_fn=criterion, max_pixels=10, clip_min=-3, clip_max=3)
+        # adversary = LinfPGDAttack(net, criterion, eps=0.05, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3)
+        # adversary_2 = GradientSignAttack(net, criterion, clip_min=-3, clip_max=3)
+        # adversary_3 = DeepfoolLinfAttack(net, 10, nb_iter=10, eps=0.05, loss_fn=criterion, clip_min=-3, clip_max=3)
+        # adversary_4 = GradientSignAttack(net, criterion, eps=0.05, clip_min=-3, clip_max=3)
+        # adversary_5 = L2PGDAttack(net, criterion, eps=0.05, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3)
+        # adversary_6 = SinglePixelAttack(net, loss_fn=criterion, max_pixels=1, clip_min=-3, clip_max=3)
+        # adversary_7 = SinglePixelAttack(net, loss_fn=criterion, max_pixels=10, clip_min=-3, clip_max=3)
+        adversary_8 = LinfPGDAttack(net, criterion, eps=0.3, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3)
+        adversary_9 = SinglePixelAttack(net, loss_fn=criterion, max_pixels=50, clip_min=-3, clip_max=3)
+        adversary_10 = L1PGDAttack(net, criterion, eps=0.05, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3)
 
         num_tests_per_batch = 10
 
-        writer.writerow(["Epoch", "Regular Accuracy (%)", 
-                         "LinfPGD  eps005 nbiter10 epsiter 001 Accuracy (%)",
-                         "FGSM  default params Accuracy (%)", 
-                         "DeepfoolLinf eps005 nbiter10 Accuracy (%)", 
-                         "FGSM eps005 Accuracy (%)",
-                         "L2PGD eps005 nbiter10 epsiter001 Accuracy (%)",
-                         "SinglePixelAttack maxpixels1 Accuracy (%)",
-                         "SinglePixelAttack maxpixels10 Accuracy (%)"])
+        writer.writerow(["Epoch", 
+                         # "Regular Accuracy (%)", 
+                         # "LinfPGD  eps005 nbiter10 epsiter 001 Accuracy (%)",
+                         # "FGSM  default params Accuracy (%)", 
+                         # "DeepfoolLinf eps005 nbiter10 Accuracy (%)", 
+                         # "FGSM eps005 Accuracy (%)",
+                         # "L2PGD eps005 nbiter10 epsiter001 Accuracy (%)",
+                         # "SinglePixelAttack maxpixels1 Accuracy (%)",
+                         # "SinglePixelAttack maxpixels10 Accuracy (%)",
+                         "LinfPGD eps03 nbiter10 epsiter001 Accuracy (%)"
+                         "SinglePixelAttack maxpixels50 Accuracy (%)",
+                         "L1PDG eps005 nbiter10 epsiter001 Accuracy (%)",
+                         ])
         
-        regular_acc = test_loop(net, adversary=None, num_tests_per_batch=num_tests_per_batch)
+        # regular_acc = test_loop(net, adversary=None, num_tests_per_batch=num_tests_per_batch)
 
-        adv_acc_1 = test_loop(net, adversary=adversary, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
-        adv_acc_2 = test_loop(net, adversary=adversary_2, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
-        adv_acc_3 = test_loop(net, adversary=adversary_3, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
-        adv_acc_4 = test_loop(net, adversary=adversary_4, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
-        adv_acc_5 = test_loop(net ,adversary=adversary_5, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
-        adv_acc_6 = test_loop(net, adversary=adversary_6, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
-        adv_acc_7 = test_loop(net, adversary=adversary_7, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
+        # adv_acc_1 = test_loop(net, adversary=adversary, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
+        # adv_acc_2 = test_loop(net, adversary=adversary_2, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
+        # adv_acc_3 = test_loop(net, adversary=adversary_3, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
+        # adv_acc_4 = test_loop(net, adversary=adversary_4, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
+        # adv_acc_5 = test_loop(net ,adversary=adversary_5, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
+        # adv_acc_6 = test_loop(net, adversary=adversary_6, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
+        # adv_acc_7 = test_loop(net, adversary=adversary_7, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
+        adv_acc_8 = test_loop(net, adversary=adversary_8, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
+        adv_acc_9 = test_loop(net, adversary=adversary_9, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
+        adv_acc_10 = test_loop(net, adversary=adversary_10, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
         
 
-        # Write results to CSV
-        writer.writerow([file, regular_acc, adv_acc_1, adv_acc_2, adv_acc_3, adv_acc_4, adv_acc_5, adv_acc_6, adv_acc_7])
+        # Write results to CS
+        # writer.writerow([file, regular_acc, adv_acc_1, adv_acc_2, adv_acc_3, adv_acc_4, adv_acc_5, adv_acc_6, adv_acc_7, adv_acc_8])
+        writer.writerow([file, adv_acc_8, adv_acc_9, adv_acc_10])
 
 
-loop_model_checkpoints("checkpoint/resnet18_RSE")
+runs = {
+    "checkpoint/resnet18_RSE_init01_inner01": (0.1,0.1),
+    "checkpoint/resnet18_RSE_init01_inner005": (0.1,0.05),
+    "checkpoint/resnet18_RSE_init02_inner01": (0.2,0.1),
+}
+
+for keys, value in runs.items():
+    print(keys, value)
+    loop_model_checkpoints(keys, std_devs=value)

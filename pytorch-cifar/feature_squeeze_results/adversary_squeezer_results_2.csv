@@ -1,0 +1,45 @@
+Attack,Squeezer,Accuracy No Squeeze,Accuracy With Squeeze,Detection Rate
+Clean,Bit Depth 1-bit,0.9529,0.7734,N/A
+Clean,Bit Depth 2-bit,0.9529,0.9312,N/A
+Clean,Bit Depth 3-bit,0.9529,0.9497,N/A
+Clean,Bit Depth 4-bit,0.9529,0.9516,N/A
+Clean,Bit Depth 5-bit,0.9529,0.9527,N/A
+Clean,Median 2x2,0.9529,0.9107,N/A
+Clean,Median 3x3,0.9529,0.8387,N/A
+Clean,NLM 11-3-2,0.9529,0.17,N/A
+Clean,NLM 11-3-4,0.9529,0.1711,N/A
+Clean,NLM 13-3-2,0.9529,0.1699,N/A
+Clean,NLM 13-3-4,0.9529,0.1718,N/A
+LinfPGD_eps005_nbiter10_epsiter001,Bit Depth 1-bit,0.0876,0.5484,0.6476
+LinfPGD_eps005_nbiter10_epsiter001,Bit Depth 2-bit,0.0891,0.2305,0.1503
+LinfPGD_eps005_nbiter10_epsiter001,Bit Depth 3-bit,0.0908,0.1138,0.0243
+LinfPGD_eps005_nbiter10_epsiter001,Bit Depth 4-bit,0.0898,0.0966,0.0072
+LinfPGD_eps005_nbiter10_epsiter001,Bit Depth 5-bit,0.0895,0.0906,0.0017
+LinfPGD_eps005_nbiter10_epsiter001,Median 2x2,0.0894,0.6888,0.631
+LinfPGD_eps005_nbiter10_epsiter001,Median 3x3,0.0878,0.7093,0.7153
+LinfPGD_eps005_nbiter10_epsiter001,NLM 11-3-2,0.0891,0.1177,0.8669
+LinfPGD_eps005_nbiter10_epsiter001,NLM 11-3-4,0.0884,0.1186,0.8693
+LinfPGD_eps005_nbiter10_epsiter001,NLM 13-3-2,0.0895,0.1192,0.8752
+LinfPGD_eps005_nbiter10_epsiter001,NLM 13-3-4,0.0908,0.1241,0.8747
+FGSM_default,Bit Depth 1-bit,0.282,0.2551,0.3483
+FGSM_default,Bit Depth 2-bit,0.282,0.2784,0.0973
+FGSM_default,Bit Depth 3-bit,0.282,0.2793,0.0357
+FGSM_default,Bit Depth 4-bit,0.282,0.2827,0.0163
+FGSM_default,Bit Depth 5-bit,0.282,0.2826,0.0094
+FGSM_default,Median 2x2,0.282,0.3806,0.4204
+FGSM_default,Median 3x3,0.282,0.3758,0.4997
+FGSM_default,NLM 11-3-2,0.282,0.1099,0.769
+FGSM_default,NLM 11-3-4,0.282,0.1101,0.7689
+FGSM_default,NLM 13-3-2,0.282,0.1099,0.769
+FGSM_default,NLM 13-3-4,0.282,0.1101,0.7689
+DeepfoolLinf_eps005_nbiter10,Bit Depth 1-bit,0.1546,0.6801,0.7059
+DeepfoolLinf_eps005_nbiter10,Bit Depth 2-bit,0.1549,0.7376,0.6147
+DeepfoolLinf_eps005_nbiter10,Bit Depth 3-bit,0.1544,0.6285,0.4886
+DeepfoolLinf_eps005_nbiter10,Bit Depth 4-bit,0.1544,0.5166,0.3783
+DeepfoolLinf_eps005_nbiter10,Bit Depth 5-bit,0.1543,0.4021,0.2794
+DeepfoolLinf_eps005_nbiter10,Median 2x2,0.1548,0.8496,0.7275
+DeepfoolLinf_eps005_nbiter10,Median 3x3,0.1545,0.7846,0.7217
+DeepfoolLinf_eps005_nbiter10,NLM 11-3-2,0.1547,0.1345,0.89
+DeepfoolLinf_eps005_nbiter10,NLM 11-3-4,0.1545,0.1378,0.8893
+DeepfoolLinf_eps005_nbiter10,NLM 13-3-2,0.155,0.1345,0.8899
+DeepfoolLinf_eps005_nbiter10,NLM 13-3-4,0.1543,0.1384,0.8892

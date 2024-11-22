@@ -89,7 +89,7 @@ def reset_bn_stats(model, dataloader, device):
 
 
 
-def test_loop(net, adversary = None, num_tests_per_batch:int = 10, set_train_for_gen: bool = True):
+def test_loop(net, adversary = None, set_train_for_gen: bool = True):
 
     test_loss = 0
     correct = 0
@@ -165,7 +165,6 @@ def loop_model_checkpoints(directory):
         adversary_9 = L1PGDAttack(net, criterion, eps=0.05, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3)
         adversary_10 = SinglePixelAttack(net, loss_fn=criterion, max_pixels=50, clip_min=-3, clip_max=3)
 
-        num_tests_per_batch = 10
 
         writer.writerow(["Epoch", "Regular Accuracy (%)", 
                          "LinfPGD  eps005 nbiter10 epsiter 001 Accuracy (%)",
@@ -179,7 +178,8 @@ def loop_model_checkpoints(directory):
                          "L1PGD eps005 nbiter10 epsiter001 Accuracy (%)",
                          "SinglePixelAttack maxpixels10 Accuracy (%)",])
         
-        regular_acc = test_loop(net, adversary=None, num_tests_per_batch=num_tests_per_batch)
+        regular_acc = test_loop(net, adversary=None)
+
 
         adv_acc_1 = test_loop(net, adversary=adversary, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
         adv_acc_2 = test_loop(net, adversary=adversary_2, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
@@ -198,4 +198,13 @@ def loop_model_checkpoints(directory):
         writer.writerow([file, regular_acc, adv_acc_1, adv_acc_2, adv_acc_3, adv_acc_4, adv_acc_5, adv_acc_6, adv_acc_7, adv_acc_8, adv_acc_9, adv_acc_10])
 
 
-loop_model_checkpoints("checkpoint/resnet18_singlemodel_EAT_premade_data_newnew_whiteandblackbox")
+
+second_models = {
+    "FGSM":"checkpoint/resnet18_adversarial_training_FGSM_defaultparams_fixedclip",
+    "LinfPGD":"checkpoint/resnet18_adversarial_training_LinfPGD_eps005_nbiter10_epsiter001_fixedclip",
+    "DeepFool":"checkpoint/resnet18_adversarial_training_DeepfoolLinf_eps005_nbiter10_fixedclip"
+}
+
+for model in second_models.values():
+    print(model)
+    loop_model_checkpoints(model)
