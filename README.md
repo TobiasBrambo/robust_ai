@@ -1,26 +1,11 @@
-# robust_ai
+# Robust AI
 
+This is the code for my project in IKT463 - AI in society, where I've compared multiple methods for improving adversarial robustness.
 
-### TODO:
-- [ ] TRACK TRAINING TIME ETC. FOR ALL EXPERIMENTS. FOR PLOTS
-- [ ] Find best CNN setup to best match the different experiments
-- [ ] Setup nice experiment pipeline (?)
-- [ ] Implement different training schemes
-- [ ] Implement different experiments, to test different training schemes
+The code used for RSE can be found in RSE_resnet18, the rest in the pytorch-cifar directory.
 
 
 
-potential setup:
-
-final table:
-- train each model using each method
-- test on a set of attacks, regardless of which have been used during training.
-    - FGSM
-    - ...
-- test all on attack method for any of the models
-    - ...
-
-- for ensamble methods, could get the accuracies for multiple different combinations of models
-
-
-https://github.com/mhrnz/Security-and-Privacy-in-Machine-Learning/tree/master
+### Repository Structure
+- RSE_resnet18/: Contains implementations and experiments related to the ResNet-18 architecture with Random Self-Ensemble (RSE) techniques.
+- pytorch-cifar/: Includes PyTorch implementations for CIFAR dataset experiments.
