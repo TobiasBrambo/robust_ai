@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 import torchvision
 import torch.backends.cudnn as cudnn
-from advertorch.attacks import LinfPGDAttack
+from advertorch.attacks import LinfPGDAttack, GradientSignAttack, DeepfoolLinfAttack
 from models import ResNet18
 import cv2
 from scipy.ndimage import median_filter
@@ -67,7 +67,7 @@ def non_local_means_batch(batch, h=10, template_window_size=7, search_window_siz
     return batch_renormalized
 
 
-def calculate_optimal_threshold(model, loader, squeezer, adversarial_attack=None, squeezer_name="squeezer"):
+def calculate_optimal_threshold(model, loader, squeezer, adversarial_attacks, squeezer_name="squeezer"):
     """
     Calculate the optimal threshold for detecting adversarial examples.
 
@@ -75,7 +75,7 @@ def calculate_optimal_threshold(model, loader, squeezer, adversarial_attack=None
         model: Trained neural network model.
         loader: DataLoader containing legitimate and adversarial examples.
         squeezer: Feature squeezing function to be applied.
-        adversarial_attack: Attack function to generate adversarial examples.
+        adversarial_attacks: List of attack functions to generate adversarial examples.
         squeezer_name: Name of the squeezer for saving the plot.
 
     Returns:
@@ -95,24 +95,19 @@ def calculate_optimal_threshold(model, loader, squeezer, adversarial_attack=None
         true_labels = true_labels.to(device)
         if do_adv:
             images.requires_grad = True
+            adversarial_attack = np.random.choice(adversarial_attacks)
             images = adversarial_attack.perturb(images, true_labels)
 
         with torch.no_grad():
+            original_prediction = m(model(images))
+            squeezed_images = squeezer(images)
+            squeezed_prediction = m(model(squeezed_images))
+            batch_distances = torch.nn.functional.l1_loss(
+                original_prediction, squeezed_prediction, reduction='none'
+            ).view(images.size(0), -1).sum(dim=1)
             if do_adv:
-                original_prediction =m(model(images))
-                squeezed_images = squeezer(images)
-                squeezed_prediction = m(model(squeezed_images))
-                batch_distances = torch.nn.functional.l1_loss(
-                    original_prediction, squeezed_prediction, reduction='none'
-                ).view(images.size(0), -1).sum(dim=1)
                 all_distances_adversarial.extend(batch_distances.cpu().numpy())
             else:
-                original_prediction = m(model(images))
-                squeezed_images = squeezer(images)
-                squeezed_prediction = m(model(squeezed_images))
-                batch_distances = torch.nn.functional.l1_loss(
-                    original_prediction, squeezed_prediction, reduction='none'
-                ).view(images.size(0), -1).sum(dim=1)
                 all_distances_legitimate.extend(batch_distances.cpu().numpy())
         if count == 100:
             break
@@ -126,8 +121,6 @@ def calculate_optimal_threshold(model, loader, squeezer, adversarial_attack=None
     plt.title(f'Histogram of L1 Distances for Legitimate and Adversarial Examples ({squeezer_name})')
     plt.legend(loc='upper right')
     plt.savefig(f'histogram_l1_distances_{squeezer_name}.png')
-    # print(all_distances_legitimate)
-    # print(all_distances_adversarial)
 
     # Determine optimal threshold by visually inspecting the histogram or using a heuristic
     optimal_threshold = (np.mean(all_distances_legitimate) + np.mean(all_distances_adversarial)) / 2
@@ -153,8 +146,12 @@ test_loader = DataLoader(
     batch_size=100, shuffle=False, num_workers=2
 )
 
-# Define adversarial attack
-adversarial_attack = LinfPGDAttack(model, loss_fn=F.cross_entropy, eps=0.05, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3)
+# Define adversarial attacks
+adversarial_attacks = [
+    LinfPGDAttack(model, loss_fn=F.cross_entropy, eps=0.05, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3),
+    GradientSignAttack(model, loss_fn=F.cross_entropy, eps=0.05, clip_min=-3, clip_max=3),
+    DeepfoolLinfAttack(model, loss_fn=F.cross_entropy, num_classes=10, eps=0.05, nb_iter=10, clip_min=-3, clip_max=3)
+]
 
 # Define feature squeezers with their respective names
 squeezers = [
@@ -170,6 +167,6 @@ squeezers = [
 
 # Calculate optimal threshold for each squeezer separately
 for squeezer, squeezer_name in squeezers:
-    optimal_threshold = calculate_optimal_threshold(model, test_loader, squeezer, adversarial_attack=adversarial_attack, squeezer_name=squeezer_name)
+    optimal_threshold = calculate_optimal_threshold(model, test_loader, squeezer, adversarial_attacks=adversarial_attacks, squeezer_name=squeezer_name)
     print(f"Optimal Threshold for {squeezer_name}: {optimal_threshold}")
 

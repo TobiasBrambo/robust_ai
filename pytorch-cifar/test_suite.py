@@ -1,4 +1,4 @@
-import argparseG
+import argparse
 import csv
 from datetime import datetime
 import os
@@ -179,23 +179,35 @@ def loop_model_checkpoints(directory):
                          "L1PGD eps005 nbiter10 epsiter001 Accuracy (%)",
                          "SinglePixelAttack maxpixels10 Accuracy (%)",])
         
-        regular_acc = test_loop(net, adversary=None)
+        # regular_acc = test_loop(net, adversary=None)
 
-        adv_acc_1 = test_loop(net, adversary=adversary, set_train_for_gen=True)
-        adv_acc_2 = test_loop(net, adversary=adversary_2, set_train_for_gen=True)
-        adv_acc_3 = test_loop(net, adversary=adversary_3, set_train_for_gen=True)
-        adv_acc_4 = test_loop(net, adversary=adversary_4, set_train_for_gen=True)
-        adv_acc_5 = test_loop(net ,adversary=adversary_5, set_train_for_gen=True)
-        adv_acc_6 = test_loop(net, adversary=adversary_6, set_train_for_gen=True)
-        adv_acc_7 = test_loop(net, adversary=adversary_7, set_train_for_gen=True)
-        adv_acc_8 = test_loop(net, adversary=adversary_8, set_train_for_gen=True)
+        # adv_acc_1 = test_loop(net, adversary=adversary, set_train_for_gen=True)
+        # adv_acc_2 = test_loop(net, adversary=adversary_2, set_train_for_gen=True)
+        # adv_acc_3 = test_loop(net, adversary=adversary_3, set_train_for_gen=True)
+        # adv_acc_4 = test_loop(net, adversary=adversary_4, set_train_for_gen=True)
+        # adv_acc_5 = test_loop(net ,adversary=adversary_5, set_train_for_gen=True)
+        # adv_acc_6 = test_loop(net, adversary=adversary_6, set_train_for_gen=True)
+        # adv_acc_7 = test_loop(net, adversary=adversary_7, set_train_for_gen=True)
+        # adv_acc_8 = test_loop(net, adversary=adversary_8, set_train_for_gen=True)
         adv_acc_9 = test_loop(net, adversary=adversary_9, set_train_for_gen=True)
-        adv_acc_10 = test_loop(net, adversary=adversary_10, set_train_for_gen=True)
+        # adv_acc_10 = test_loop(net, adversary=adversary_10, set_train_for_gen=True)
         
         
 
         # Write results to CSV
-        writer.writerow([file, regular_acc, adv_acc_1, adv_acc_2, adv_acc_3, adv_acc_4, adv_acc_5, adv_acc_6, adv_acc_7, adv_acc_8, adv_acc_9, adv_acc_10])
+        # writer.writerow([file, regular_acc, adv_acc_1, adv_acc_2, adv_acc_3, adv_acc_4, adv_acc_5, adv_acc_6, adv_acc_7, adv_acc_8, adv_acc_9, adv_acc_10])
+        print()
+        print(adv_acc_9)
+        print()
 
 
-loop_model_checkpoints("checkpoint/resnet18_clean")
+second_models = {
+    "FGSM":"checkpoint/resnet18_adversarial_training_FGSM_defaultparams_fixedclip",
+    "LinfPGD":"checkpoint/resnet18_adversarial_training_LinfPGD_eps005_nbiter10_epsiter001_fixedclip",
+    "DeepFool":"checkpoint/resnet18_adversarial_training_DeepfoolLinf_eps005_nbiter10_fixedclip"
+}
+
+for model in second_models.values():
+    print(model)
+    loop_model_checkpoints(model)
+

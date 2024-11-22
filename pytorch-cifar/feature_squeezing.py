@@ -155,14 +155,14 @@ individual_squeezers = [
     # {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=3)], "threshold": 1.7822, "name": "3-bit"},
     # {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=4, new_mean=False)], "threshold": 0.2329, "name": "4-bit"},
     # {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=5, new_mean=False)], "threshold": 0.0948, "name": "5-bit"},
-    {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=4, new_mean=True)], "threshold": 0.2329, "name": "4-bit_newmean"},
-    {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=5, new_mean=True)], "threshold": 0.0948, "name": "5-bit_newmean"},
-    {"squeezer": [lambda batch: median_filter_batch(batch, filter_size=2)], "threshold": 0.6512, "name": "Median 2x2"},
-    {"squeezer": [lambda batch: median_filter_batch(batch, filter_size=3)], "threshold": 0.8047, "name": "Median 3x3"},
-    {"squeezer": [lambda batch: non_local_means_batch(batch, h=2, template_window_size=3, search_window_size=11)], "threshold": 0.1797, "name": "NLM 11-3-2"},
-    {"squeezer": [lambda batch: non_local_means_batch(batch, h=4, template_window_size=3, search_window_size=11)], "threshold": 0.4142, "name": "NLM 11-3-4"},
-    {"squeezer": [lambda batch: non_local_means_batch(batch, h=2, template_window_size=3, search_window_size=13)], "threshold": 0.1511, "name": "NLM 13-3-2"},
-    {"squeezer": [lambda batch: non_local_means_batch(batch, h=4, template_window_size=3, search_window_size=13)], "threshold": 0.4235, "name": "NLM 13-3-4"},
+    {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=4, new_mean=True)], "threshold": 0.2991, "name": "4-bit_newmean"},
+    {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=5, new_mean=True)], "threshold": 0.1746, "name": "5-bit_newmean"},
+    {"squeezer": [lambda batch: median_filter_batch(batch, filter_size=2)], "threshold": 0.5501, "name": "Median 2x2"},
+    {"squeezer": [lambda batch: median_filter_batch(batch, filter_size=3)], "threshold": 0.6631, "name": "Median 3x3"},
+    {"squeezer": [lambda batch: non_local_means_batch(batch, h=2, template_window_size=3, search_window_size=11)], "threshold": 0.2253, "name": "NLM 11-3-2"},
+    {"squeezer": [lambda batch: non_local_means_batch(batch, h=4, template_window_size=3, search_window_size=11)], "threshold": 0.3744, "name": "NLM 11-3-4"},
+    {"squeezer": [lambda batch: non_local_means_batch(batch, h=2, template_window_size=3, search_window_size=13)], "threshold": 0.2162, "name": "NLM 13-3-2"},
+    {"squeezer": [lambda batch: non_local_means_batch(batch, h=4, template_window_size=3, search_window_size=13)], "threshold": 0.3737, "name": "NLM 13-3-4"},
 ]
 
 # Define feature squeezers and thresholds for combination testing
@@ -204,7 +204,7 @@ if __name__ == "__main__":
         adversarial_attacks = [
             ("LinfPGD", LinfPGDAttack(model, loss_fn=F.cross_entropy, eps=0.05, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3)),
             ("Deepfool", DeepfoolLinfAttack(model, loss_fn=F.cross_entropy, eps=0.05, nb_iter=10, clip_min=-3, clip_max=3)),
-            ("FGSM", GradientSignAttack(model, loss_fn=F.cross_entropy, clip_min=-3, clip_max=3)),
+            ("FGSM", GradientSignAttack(model, loss_fn=F.cross_entropy, eps=0.05, clip_min=-3, clip_max=3)),
         ]
 
         # Evaluate each squeezer individually
