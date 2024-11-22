@@ -167,7 +167,7 @@ from datetime import datetime
 
 # Create a unique checkpoint directory to avoid overwriting previous runs
 current_time = datetime.now().strftime('%Y%m%d_%H%M%S')
-checkpoint_dir = f'./checkpoint/resnet18_singlemodel_EAT_premade_data_actually20cleanfirst'
+checkpoint_dir = f'./checkpoint/resnet18_singlemodel_EAT_premade_data_newnew_whiteandblackbox'
 os.makedirs(checkpoint_dir, exist_ok=True)
 
 csv_file_path = os.path.join(checkpoint_dir, 'training_results.csv')
@@ -176,9 +176,22 @@ best_acc = 0
 best_adv_acc = 0
 best_combined_acc = 0
 
+runtime_attacks = [
+    LinfPGDAttack,
+    GradientSignAttack,
+    DeepfoolLinfAttack
+]
 
+runtime_attack_params = {
+    "DeepfoolLinfAttack": {"num_classes":10, "nb_iter": 10, "eps": 0.05, "clip_min": -3, "clip_max": 3},
+    "LinfPGDAttack": {"eps": 0.1, "eps_iter": 0.01, "nb_iter": 10, "clip_min": -3, "clip_max": 3},
+    "GradientSignAttack": {"clip_min": -3, "clip_max": 3},
+}
 
-def train(epoch):
+def get_attack(attack_class, net, criterion, **kwargs):
+    return attack_class(net, loss_fn=criterion, **kwargs)
+
+def train(epoch, new_training_method:bool = True):
     print('\nEpoch: %d' % epoch)
     net.train()
     train_loss = 0
@@ -196,10 +209,25 @@ def train(epoch):
         # Randomly pick which batch to use for this iteration
         if epoch < 20:
             selected_loader_index = -1
+            inputs, targets = batches[selected_loader_index]
+            inputs, targets = inputs.to(device), targets.to(device)
         else:
             selected_loader_index = random.randint(0, len(train_loaders) - 1)
-        inputs, targets = batches[selected_loader_index]
-        inputs, targets = inputs.to(device), targets.to(device)
+            
+            inputs, targets = batches[selected_loader_index]
+            inputs, targets = inputs.to(device), targets.to(device)
+            
+            if selected_loader_index == 14 and random.random() < 0.5:
+                temp = random.choice(runtime_attacks)
+                temp_name = temp.__name__
+                adversary = get_attack(temp, net=net, criterion=criterion, **runtime_attack_params[temp_name])
+                net.eval()
+                inputs = adversary.perturb(inputs, targets)
+                net.train()
+        
+        
+        
+        
         
         optimizer.zero_grad()
         outputs = net(inputs)
@@ -253,7 +281,7 @@ def test(epoch):
         best_acc = test_acc
 
     # Save model after every epoch
-    # torch.save(net.state_dict(), os.path.join(checkpoint_dir, f'model_epoch_{epoch}.pth'))
+    torch.save(net.state_dict(), os.path.join(checkpoint_dir, f'last_epoch.pth'))
 
     return test_acc, test_time
 

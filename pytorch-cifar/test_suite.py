@@ -140,7 +140,7 @@ def loop_model_checkpoints(directory):
 
         # files = ["best_regular_model.pth"]
 
-        file = "best_regular_model.pth"
+        file = "last_epoch.pth"
 
         checkpoint_path = os.path.join(directory, file)
         print(f'Testing checkpoint: {file}')
@@ -163,7 +163,7 @@ def loop_model_checkpoints(directory):
         adversary_7 = SinglePixelAttack(net, loss_fn=criterion, max_pixels=10, clip_min=-3, clip_max=3)
         adversary_8 = LinfPGDAttack(net, criterion, eps=0.3, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3)
         adversary_9 = L1PGDAttack(net, criterion, eps=0.05, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3)
-        
+        adversary_10 = SinglePixelAttack(net, loss_fn=criterion, max_pixels=50, clip_min=-3, clip_max=3)
 
         num_tests_per_batch = 10
 
@@ -176,7 +176,8 @@ def loop_model_checkpoints(directory):
                          "SinglePixelAttack maxpixels1 Accuracy (%)",
                          "SinglePixelAttack maxpixels10 Accuracy (%)",
                          "LinfPGD  eps03 nbiter10 epsiter001 Accuracy (%)",
-                         "L1PGD eps005 nbiter10 epsiter001 Accuracy (%)",])
+                         "L1PGD eps005 nbiter10 epsiter001 Accuracy (%)",
+                         "SinglePixelAttack maxpixels10 Accuracy (%)",])
         
         regular_acc = test_loop(net, adversary=None, num_tests_per_batch=num_tests_per_batch)
 
@@ -189,11 +190,12 @@ def loop_model_checkpoints(directory):
         adv_acc_7 = test_loop(net, adversary=adversary_7, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
         adv_acc_8 = test_loop(net, adversary=adversary_8, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
         adv_acc_9 = test_loop(net, adversary=adversary_9, num_tests_per_batch=num_tests_per_batch, set_train_for_gen=True)
-        
-        
+        adv_acc_10 = test_loop(net, adversary=adversary_10, set_train_for_gen=True)
+
+
 
         # Write results to CSV
-        writer.writerow([file, regular_acc, adv_acc_1, adv_acc_2, adv_acc_3, adv_acc_4, adv_acc_5, adv_acc_6, adv_acc_7, adv_acc_8, adv_acc_9])
+        writer.writerow([file, regular_acc, adv_acc_1, adv_acc_2, adv_acc_3, adv_acc_4, adv_acc_5, adv_acc_6, adv_acc_7, adv_acc_8, adv_acc_9, adv_acc_10])
 
 
-loop_model_checkpoints("checkpoint/resnet18_singlemodel_EAT_premade_data_20cleanfirst")
+loop_model_checkpoints("checkpoint/resnet18_singlemodel_EAT_premade_data_newnew_whiteandblackbox")
