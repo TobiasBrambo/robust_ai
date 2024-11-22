@@ -10,7 +10,6 @@ import os
 from models import *  # Import your models
 
 def make_data(model, attack, model_name, attack_name, batch_size=64):
-    # Define transformations
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
@@ -32,13 +31,10 @@ def make_data(model, attack, model_name, attack_name, batch_size=64):
     for i, (images, labels) in enumerate(trainloader):
         images, labels = images.to(device), labels.to(device)
 
-        # Generate adversarial images for the batch
         adv_images = attack.perturb(images, labels)
 
-        # save images
         for j in range(images.size(0)):
             label = labels[j].item()
-            # Save image with label in filename
             img_index = i * batch_size + j  # Correct global index for each image
             image_path = os.path.join(output_dir, f"img_{img_index}_label_{label}.png")
             vutils.save_image(adv_images[j], image_path)
@@ -56,13 +52,12 @@ if __name__ == "__main__":
     # Define models
     model_dict = {
         "resnet50": ResNet50(),
-        # "resnet18": ResNet18(),
-        # "SimpleDLA": SimpleDLA(),
-        # "DenseNet121": DenseNet121(),
-        # "LeNet": LeNet(),
+        "resnet18": ResNet18(),
+        "SimpleDLA": SimpleDLA(),
+        "DenseNet121": DenseNet121(),
+        "LeNet": LeNet(),
     }
 
-    # Define attacks with parameters included in names
     attack_dict = {
         "resnet50": [
             ("LinfPGD_eps005_iter10_step009", lambda model: LinfPGDAttack(model, nn.CrossEntropyLoss(), eps=0.05, nb_iter=10, eps_iter=0.009)),
@@ -70,18 +65,18 @@ if __name__ == "__main__":
             ("FGSM_eps03", lambda model: GradientSignAttack(model, nn.CrossEntropyLoss(), eps=0.3)),
             ("DeepFool_eps005_iter10", lambda model: DeepfoolLinfAttack(model, num_classes=10, nb_iter=10, eps=0.05, loss_fn=nn.CrossEntropyLoss())),
         ],
-        # "LeNet": [
-        #     ("LinfPGD_eps005_iter10_step01", lambda model: LinfPGDAttack(model, nn.CrossEntropyLoss(), eps=0.05, nb_iter=10, eps_iter=0.01)),
-        #     ("L2PGD_eps005_iter10_step01", lambda model: L2PGDAttack(model, nn.CrossEntropyLoss(), eps=0.05, nb_iter=10, eps_iter=0.01)),
-        # ],
-        # "SimpleDLA": [
-        #     # ("FGSM_default_params", lambda model: GradientSignAttack(model, nn.CrossEntropyLoss())),
-        #     ("DeepFool_eps005_iter10", lambda model: DeepfoolLinfAttack(model, num_classes=10, nb_iter=10, eps=0.05, loss_fn=nn.CrossEntropyLoss())),
-        # ],
-        # "DenseNet121": [
-        #     ("LinfPGD_eps005_iter10_step01", lambda model: LinfPGDAttack(model, nn.CrossEntropyLoss(), eps=0.05, nb_iter=10, eps_iter=0.01)),
-        #     ("L2PGD_eps005_iter10_step01", lambda model: L2PGDAttack(model, nn.CrossEntropyLoss(), eps=0.05, nb_iter=10, eps_iter=0.01)),
-        # ],
+        "LeNet": [
+            ("LinfPGD_eps005_iter10_step01", lambda model: LinfPGDAttack(model, nn.CrossEntropyLoss(), eps=0.05, nb_iter=10, eps_iter=0.01)),
+            ("L2PGD_eps005_iter10_step01", lambda model: L2PGDAttack(model, nn.CrossEntropyLoss(), eps=0.05, nb_iter=10, eps_iter=0.01)),
+        ],
+        "SimpleDLA": [
+            ("FGSM_default_params", lambda model: GradientSignAttack(model, nn.CrossEntropyLoss())),
+            ("DeepFool_eps005_iter10", lambda model: DeepfoolLinfAttack(model, num_classes=10, nb_iter=10, eps=0.05, loss_fn=nn.CrossEntropyLoss())),
+        ],
+        "DenseNet121": [
+            ("LinfPGD_eps005_iter10_step01", lambda model: LinfPGDAttack(model, nn.CrossEntropyLoss(), eps=0.05, nb_iter=10, eps_iter=0.01)),
+            ("L2PGD_eps005_iter10_step01", lambda model: L2PGDAttack(model, nn.CrossEntropyLoss(), eps=0.05, nb_iter=10, eps_iter=0.01)),
+        ],
     }
 
     for model_name, model_class in model_dict.items():

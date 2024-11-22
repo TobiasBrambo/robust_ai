@@ -98,18 +98,13 @@ def reduce_color_depth_batch_debug(batch, bit_depth=4):
     return batch_bit_reduced, new_mean, new_std
 
 
-# Main function to run the feature squeezing and visualization
 def main():
-    # Load the clean image
     image, label = load_clean_image()
     image = image.cuda()
 
-    # Apply feature squeezers
     squeezed_images = []
     titles = []
 
-    # Reduce color depth with new function
-    # squeezed_images.append(reduce_color_depth_batch_debug(image, bit_depth=4).squeeze())
     bit_reduced_batch, new_mean, new_std = reduce_color_depth_batch_debug(image, bit_depth=4)
     batch_new_normalized = (bit_reduced_batch - new_mean) / new_std
     squeezed_images.append(batch_new_normalized.squeeze())
@@ -117,16 +112,13 @@ def main():
 
     old_mean = [0.4914, 0.4822, 0.4465]
     old_std = [0.2023, 0.1994, 0.2010]
-    # torch.tensor(old_std, device=batch.device).view(1, 3, 1, 1) + torch.tensor(old_mean, device=batch.device).view(1, 3, 1, 1)
     batch_old_normalized = (bit_reduced_batch - torch.tensor(old_mean, device="cuda").view(1, 3, 1, 1)) / torch.tensor(old_std, device="cuda").view(1, 3, 1, 1) 
     squeezed_images.append(batch_old_normalized.squeeze())
     titles.append("4-bit Depth (old Batch Renormalized)")
 
-    # Apply median filter 3x3
     squeezed_images.append(median_filter_batch(image, filter_size=3).squeeze())
     titles.append("Median 3x3")
 
-    # Apply non-local means filter with different values for debugging
     nlm_params = [
         (11, 3, 2),
         (11, 3, 4),
@@ -137,7 +129,6 @@ def main():
         squeezed_images.append(non_local_means_batch_debug(image, h=h, template_window_size=template_window, search_window_size=search_window).squeeze())
         titles.append(f"NLM {search_window}-{template_window}-{h}")
 
-    # Save images side by side
     save_and_display_squeezed_images(image.squeeze(), squeezed_images, titles)
 
 if __name__ == "__main__":

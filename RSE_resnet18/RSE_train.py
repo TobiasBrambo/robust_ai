@@ -55,8 +55,6 @@ testset = torchvision.datasets.CIFAR10(
 testloader = torch.utils.data.DataLoader(
     testset, batch_size=100, shuffle=False, num_workers=2)
 
-classes = ('plane', 'car', 'bird', 'cat', 'deer',
-           'dog', 'frog', 'horse', 'ship', 'truck')
 
 # Model
 print('==> Building model..')
@@ -79,12 +77,6 @@ criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=args.lr,
                       momentum=0.9, weight_decay=5e-4)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-
-# params based on: https://github.com/BorealisAI/advertorch/issues/76#issuecomment-692436644
-# adversary = LinfPGDAttack(net, criterion, eps=0.031, nb_iter=10, eps_iter=0.007)
-# adversary = LinfPGDAttack(net, criterion, eps=0.04, nb_iter=10, eps_iter=0.007)
-# adversary = GradientSignAttack(net, criterion)
-
 
 
 # Create a unique checkpoint directory to avoid overwriting previous runs
@@ -182,25 +174,22 @@ with open(csv_file_path, 'w', newline='') as csvfile:
     writer = csv.writer(csvfile)
     writer.writerow(['Epoch', 'Train_Acc', 'Clean_Test_Acc', 'Train_Time', 'Clean_Test_Time'])
 
-# Define early stopping parameters
-patience = 20  # Number of epochs to wait for improvement before stopping
+patience = 20  
 early_stop_counter = 0
-best_val_acc = 0  # Track the best validation accuracy
+best_val_acc = 0  
 
 for epoch in range(start_epoch, start_epoch + 200):
     train_acc, train_time = train(epoch)
     clean_test_acc, clean_test_time = test(epoch)
     scheduler.step()
 
-    # Write results to CSV
     with open(csv_file_path, 'a', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow([epoch, train_acc, clean_test_acc, train_time, clean_test_time])
 
-    # Early stopping logic
     if clean_test_acc > best_val_acc:
         best_val_acc = clean_test_acc
-        early_stop_counter = 0  # Reset counter if there is improvement
+        early_stop_counter = 0  
     else:
         early_stop_counter += 1
 

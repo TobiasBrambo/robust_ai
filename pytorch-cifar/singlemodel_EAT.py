@@ -14,7 +14,7 @@ import argparse
 from models import *
 from utils import progress_bar
 
-from advertorch.attacks import LinfPGDAttack, GradientSignAttack, L1PGDAttack, L2PGDAttack, DeepfoolLinfAttack
+from advertorch.attacks import LinfPGDAttack, GradientSignAttack, DeepfoolLinfAttack
 import numpy as np
 
 from torch.utils.data import Dataset
@@ -24,11 +24,7 @@ import random
 
 class AdversarialDataset(Dataset):
     def __init__(self, root_dir, transform=None):
-        """
-        Args:
-            root_dir (string): Directory with all the adversarial images.
-            transform (callable, optional): Transform to be applied on an image.
-        """
+
         self.root_dir = root_dir
         self.image_files = sorted(os.listdir(root_dir))  # Sort to maintain order
         self.transform = transform
@@ -48,25 +44,14 @@ class AdversarialDataset(Dataset):
         return image, label
 
 def create_adversarial_loaders(base_dir, batch_size=128, num_workers=2):
-    """
-    Args:
-        base_dir (string): The base directory containing model-specific adversarial subdirectories.
-        batch_size (int): Batch size for the DataLoader.
-        num_workers (int): Number of worker threads for data loading.
-    
-    Returns:
-        dict: A dictionary of DataLoader objects, keyed by `<model>/<attack>`.
-    """
-    # Define transformations
+
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
 
-    # Dictionary to store loaders
     loaders = []
 
-    # Walk through the directory structure
     for model_name in os.listdir(base_dir):
         model_dir = os.path.join(base_dir, model_name)
         print(model_dir)
@@ -78,7 +63,6 @@ def create_adversarial_loaders(base_dir, batch_size=128, num_workers=2):
             if not os.path.isdir(attack_dir):
                 continue  # Skip non-directory entries
             
-            # Create a DataLoader for this attack
             dataset = AdversarialDataset(root_dir=attack_dir, transform=transform)
             loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 

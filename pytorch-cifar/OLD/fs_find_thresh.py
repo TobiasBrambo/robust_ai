@@ -112,7 +112,6 @@ def calculate_optimal_threshold(model, loader, squeezer, adversarial_attacks, sq
         if count == 100:
             break
 
-    # Plot histograms to visualize the separation between legitimate and adversarial examples
     plt.figure()
     plt.hist(all_distances_legitimate, bins=50, alpha=0.5, label='Legitimate Examples', color='b')
     plt.hist(all_distances_adversarial, bins=50, alpha=0.5, label='Adversarial Examples', color='r')
@@ -127,7 +126,6 @@ def calculate_optimal_threshold(model, loader, squeezer, adversarial_attacks, sq
 
     return optimal_threshold
 
-# Load model and DataLoader
 device = "cuda"
 model = ResNet18().to(device)
 if device == 'cuda':
@@ -146,14 +144,12 @@ test_loader = DataLoader(
     batch_size=100, shuffle=False, num_workers=2
 )
 
-# Define adversarial attacks
 adversarial_attacks = [
     LinfPGDAttack(model, loss_fn=F.cross_entropy, eps=0.05, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3),
     GradientSignAttack(model, loss_fn=F.cross_entropy, eps=0.05, clip_min=-3, clip_max=3),
     DeepfoolLinfAttack(model, loss_fn=F.cross_entropy, num_classes=10, eps=0.05, nb_iter=10, clip_min=-3, clip_max=3)
 ]
 
-# Define feature squeezers with their respective names
 squeezers = [
     (lambda batch: reduce_color_depth_batch(batch, bit_depth=4), "reduce_color_depth_4bit"),
     (lambda batch: reduce_color_depth_batch(batch, bit_depth=5), "reduce_color_depth_5bit"),
@@ -165,7 +161,6 @@ squeezers = [
     (lambda batch: non_local_means_batch(batch, h=4, template_window_size=3, search_window_size=13), "nlm_h4_tw3_sw13")
 ]
 
-# Calculate optimal threshold for each squeezer separately
 for squeezer, squeezer_name in squeezers:
     optimal_threshold = calculate_optimal_threshold(model, test_loader, squeezer, adversarial_attacks=adversarial_attacks, squeezer_name=squeezer_name)
     print(f"Optimal Threshold for {squeezer_name}: {optimal_threshold}")

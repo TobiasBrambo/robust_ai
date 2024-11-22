@@ -20,7 +20,6 @@ import numpy as np
 from models import ResNet18
 from collections import Counter
 
-# Feature Squeezing Functions
 def reduce_color_depth_batch(batch, bit_depth=4, new_mean:bool = True):
     mean = [0.4914, 0.4822, 0.4465]
     std = [0.2023, 0.1994, 0.2010]
@@ -44,7 +43,6 @@ def reduce_color_depth_batch(batch, bit_depth=4, new_mean:bool = True):
 
 
 def median_filter_batch(batch, filter_size=3):
-    # Unnormalize the image
     batch = (batch * torch.tensor([0.2023, 0.1994, 0.2010], device=batch.device).view(1, 3, 1, 1)) + \
             torch.tensor([0.4914, 0.4822, 0.4465], device=batch.device).view(1, 3, 1, 1)
     batch = torch.clamp(batch, 0, 1)
@@ -53,7 +51,6 @@ def median_filter_batch(batch, filter_size=3):
     smoothed = np.stack([median_filter(img, size=(filter_size, filter_size, 1)) for img in batch_np])
     smoothed = torch.tensor(smoothed, dtype=torch.float).permute(0, 3, 1, 2).to(batch.device)
 
-    # Renormalize the image
     smoothed = (smoothed - torch.tensor([0.4914, 0.4822, 0.4465], device=batch.device).view(1, 3, 1, 1)) / \
                torch.tensor([0.2023, 0.1994, 0.2010], device=batch.device).view(1, 3, 1, 1)
 
@@ -83,7 +80,10 @@ def non_local_means_batch(batch, h=10, template_window_size=7, search_window_siz
     batch_renormalized = (smoothed_tensor - torch.tensor(mean, device=batch.device).view(1, 3, 1, 1)) / torch.tensor(std, device=batch.device).view(1, 3, 1, 1)
     return batch_renormalized
 
-# Feature Squeezing Pipeline
+
+
+
+
 def feature_squeezing_pipeline(model, input_batch, squeezers, threshold):
     model.eval()
     distances = []
@@ -99,7 +99,6 @@ def feature_squeezing_pipeline(model, input_batch, squeezers, threshold):
     is_adversarial = max_distances > threshold
     return is_adversarial, max_distances
 
-# Evaluation Function
 def evaluate_with_feature_squeezing_grouped(model, loader, squeezers, threshold, adversarial_attack=None, evaluate_clean=False):
     results = {
         "total": 0,
@@ -147,8 +146,6 @@ def evaluate_with_feature_squeezing_grouped(model, loader, squeezers, threshold,
     
     return results
 
-# Usage Example
-# Define individual feature squeezers and thresholds for testing individually
 individual_squeezers = [
     # {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=1)], "threshold": 1.9997, "name": "1-bit"},
     # {"squeezer": [lambda batch: reduce_color_depth_batch(batch, bit_depth=2)], "threshold": 1.9967, "name": "2-bit"},
@@ -165,7 +162,6 @@ individual_squeezers = [
     {"squeezer": [lambda batch: non_local_means_batch(batch, h=4, template_window_size=3, search_window_size=13)], "threshold": 0.3737, "name": "NLM 13-3-4"},
 ]
 
-# Define feature squeezers and thresholds for combination testing
 squeezer_combination = {
     "squeezers": [
         lambda batch: reduce_color_depth_batch(batch, bit_depth=5),
@@ -175,7 +171,6 @@ squeezer_combination = {
     "threshold": 1.1402
 }
 
-# Load model and DataLoader
 device = "cuda"
 model = ResNet18().to(device)
 if device == 'cuda':
@@ -200,16 +195,13 @@ if __name__ == "__main__":
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
 
-        # Define adversarial attacks
         adversarial_attacks = [
             ("LinfPGD", LinfPGDAttack(model, loss_fn=F.cross_entropy, eps=0.05, nb_iter=10, eps_iter=0.01, clip_min=-3, clip_max=3)),
             ("Deepfool", DeepfoolLinfAttack(model, loss_fn=F.cross_entropy, eps=0.05, nb_iter=10, clip_min=-3, clip_max=3)),
             ("FGSM", GradientSignAttack(model, loss_fn=F.cross_entropy, eps=0.05, clip_min=-3, clip_max=3)),
         ]
 
-        # Evaluate each squeezer individually
         for squeezer_info in individual_squeezers:
-            # Evaluate on clean dataset without adversarial attack
             print(f"Evaluating {squeezer_info['name']} without adversarial attack")
             results = evaluate_with_feature_squeezing_grouped(
                 model, 
@@ -220,11 +212,9 @@ if __name__ == "__main__":
                 evaluate_clean=True
             )
 
-            # Print results
             print(f"{squeezer_info['name']} Results without attack:")
             print("Legitimate Accuracy:", results["legitimate_accuracy"])
 
-            # Write to CSV
             writer.writerow({
                 "Squeezer": squeezer_info["name"],
                 "Adversarial Attack": "None",
@@ -232,7 +222,6 @@ if __name__ == "__main__":
                 "Adversarial Detection Rate": "N/A"
             })
 
-            # Evaluate with adversarial attacks
             for attack_name, adversarial_attack in adversarial_attacks:
                 print(f"Evaluating {squeezer_info['name']} with {attack_name} attack")
                 results = evaluate_with_feature_squeezing_grouped(
@@ -243,12 +232,10 @@ if __name__ == "__main__":
                     adversarial_attack=adversarial_attack
                 )
 
-                # Print results
                 print(f"{squeezer_info['name']} Results with {attack_name}:")
                 print("Legitimate Accuracy:", results["legitimate_accuracy"])
                 print("Adversarial Detection Rate:", results["adversarial_detection_rate"])
 
-                # Write to CSV
                 writer.writerow({
                     "Squeezer": squeezer_info["name"],
                     "Adversarial Attack": attack_name,
@@ -256,7 +243,6 @@ if __name__ == "__main__":
                     "Adversarial Detection Rate": results["adversarial_detection_rate"]
                 })
 
-        # Evaluate the combination of feature squeezers
         for attack_name, adversarial_attack in adversarial_attacks:
             print(f"Evaluating combined feature squeezers with {attack_name} attack")
             results = evaluate_with_feature_squeezing_grouped(
@@ -267,12 +253,10 @@ if __name__ == "__main__":
                 adversarial_attack=adversarial_attack
             )
 
-            # Print results
             print(f"Combined Feature Squeezers Results with {attack_name}:")
             print("Legitimate Accuracy:", results["legitimate_accuracy"])
             print("Adversarial Detection Rate:", results["adversarial_detection_rate"])
 
-            # Write to CSV
             writer.writerow({
                 "Squeezer": "Combined (5-bit, Median 2x2, NLM 13-3-2)",
                 "Adversarial Attack": attack_name,
